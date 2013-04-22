@@ -56,7 +56,7 @@ def main():
 	
 	
 def graph_maker(sebreddit_name):
-	conn = lite.connect('reddit.db');
+	conn = lite.connect('reddit.sqlite');
 	c = conn.cursor();
 	c.execute('SELECT * FROM Subreddit WHERE display_name=?', [sebreddit_name.lower()]);
 	subreddit = c.fetchone();

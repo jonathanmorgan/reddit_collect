@@ -1,10 +1,14 @@
 #!/usr/bin/python
 
-from reddiwrap.ReddiWrap import ReddiWrap
-import myLib
 import time
 import sys
 
+path = '/home/socs/socs_reddit/'
+if path not in sys.path:
+        sys.path.append(path)
+
+import myLib
+from reddiwrap.ReddiWrap import ReddiWrap
 
 reddit = ReddiWrap(user_agent='ReddiWrap')
 

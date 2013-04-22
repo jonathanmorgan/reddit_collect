@@ -8,8 +8,9 @@ import reddiwrap.ReddiWrap as rdd
 
 def insert_row(values, table):
 #	Insert values in table
-	conn = lite.connect('reddit.db')
+	conn = lite.connect('reddit.sqlite')
 	c = conn.cursor();		
+
 	# making Question mark part
 	qmark_str = "";
 	for i in range(0, len(values)-1): qmark_str = qmark_str + "?,";
@@ -24,7 +25,7 @@ def insert_row(values, table):
 
 def exsits_row(rowID, table):
 #	checks if this row.id exists in the table or not
-	conn = lite.connect('reddit.db');
+	conn = lite.connect('reddit.sqlite');
 	c = conn.cursor();
 	
 	# c.execute('SELECT 1 FROM Post WHERE name=?', [post.id]); # it should be faster
@@ -50,7 +51,7 @@ def int_to_bool(intvar):
 	
 
 def retreive_subreddit(display_name):
-	conn = lite.connect('reddit.db');
+	conn = lite.connect('reddit.sqlite');
 	c = conn.cursor();
 	c.execute('SELECT * FROM Subreddit WHERE display_name=?', [display_name]);
 	# print c.fetchone()
@@ -97,33 +98,33 @@ def retrieve_post_traits2(post):
 
 
 def posts_of_reddit(subreddit_id):
-	conn = lite.connect('reddit.db');
+	conn = lite.connect('reddit.sqlite');
 	c = conn.cursor();
 	c.execute('SELECT * FROM Post WHERE subreddit_id=?', [subreddit_id]);
 	return c.fetchall();
 
 def make_post_obj(post):
 	pstObj = rdd.Post();
-	postDic = retrieve_post_traits2(post);
+	postDict = retrieve_post_traits2(post);
 	
-	pstObj.id = postDic['id'];
-	pstObj.name = postDic['name'];
-	pstObj.title = postDic['title'];
-	pstObj.url = postDic['url'];
-	pstObj.author = postDic['author'];
-	pstObj.domain = postDic['domain'];
-	pstObj.subreddit = postDic['subreddit'];
-	pstObj.subreddit_id = postDic['subreddit_id'];
-	pstObj.permalink = postDic['permlink'];	
-	pstObj.is_self = int_to_bool(postDic['is_self']);
-	pstObj.selftext = postDic['selftext'];
-	pstObj.num_comments = postDic['num_comments'];
-	pstObj.score = postDic['score'];
-	pstObj.upvotes = postDic['upvotes'];
-	pstObj.downvotes = postDic['downvotes'];
-	pstObj.over_18 = int_to_bool(postDic['over_18']);
-	pstObj.created =  postDic['created']; 
-	pstObj.num_reports = postDic['num_reports'];
+	pstObj.id = postDict['id'];
+	pstObj.name = postDict['name'];
+	pstObj.title = postDict['title'];
+	pstObj.url = postDict['url'];
+	pstObj.author = postDict['author'];
+	pstObj.domain = postDict['domain'];
+	pstObj.subreddit = postDict['subreddit'];
+	pstObj.subreddit_id = postDict['subreddit_id'];
+	pstObj.permalink = postDict['permlink'];	
+	pstObj.is_self = int_to_bool(postDict['is_self']);
+	pstObj.selftext = postDict['selftext'];
+	pstObj.num_comments = postDict['num_comments'];
+	pstObj.score = postDict['score'];
+	pstObj.upvotes = postDict['upvotes'];
+	pstObj.downvotes = postDict['downvotes'];
+	pstObj.over_18 = int_to_bool(postDict['over_18']);
+	pstObj.created =  postDict['created']; 
+	pstObj.num_reports = postDict['num_reports'];
 	
 	return pstObj;
 	

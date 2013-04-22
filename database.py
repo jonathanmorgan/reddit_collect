@@ -1,5 +1,5 @@
 import sqlite3 as lite
-conn = lite.connect('reddit.db')
+conn = lite.connect('reddit.sqlite')
 
 c = conn.cursor()
 
