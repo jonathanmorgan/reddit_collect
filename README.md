@@ -39,7 +39,13 @@ This code collects and stores data from reddit in a database, using django ORM m
 - cd into the reddit_socs directory.
 
         cd socs_reddit
-    
+
+### Configure settings.py
+
+- set USE_TZ to false to turn off time zone support:
+
+        USE_TZ = False
+
 - configure the database in settings.py
 
     - For mysql:
@@ -138,7 +144,20 @@ This code collects and stores data from reddit in a database, using django ORM m
     #-- END iteration over search results --#
     
     # try getting all from /r/all - see if we can step past 1000 results.
-    reddiwrap.get( "/r/%s/new?limit=100" % "all" )    
+    post_list = reddiwrap.get( "/r/%s/new?limit=100" % "all" )
+    
+    # get first post in list.
+    test_post = post_list[ 0 ]
+
+    # create django model instance.
+    import reddit_collect.models
+    django_post = reddit_collect.models.Post()
+
+    # populate from test_post
+    django_post.set_fields_from_reddiwrap( test_post )
+    
+    # save to database.
+    django_post.save()
 
 ## Notes
 
@@ -153,9 +172,9 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 - continue to look over and understand code.
 - built models.  Update sqlite database, code so it has a separate unique ID, then reddit_id.
-- Q - change names of tables to what django would make, or leave them as iman named them?  And in general, how to migrate this to mysql?  Need to change table names, switch to django models for queries, inserts, etc.
+- Change table names, switch to django models for queries, inserts, etc.
 - Q - do we need to keep checking in on posts, comments until they reach a certain stability criteria?  Or just for a certain time period?
 - Q - Do we want time series on votes, voting, scores?
-- need mysql so we can have concurrency (scanning for and categorizing URLs, for example, while reddit collection is still ongoing).
-- need to work on the code for collection - gather user info?  check back in on posts, comments?
-- Q - need a way to load JSON directly into django model instance, or is it OK to just load from ReddiWrapper objects?
+- // need mysql so we can have concurrency (scanning for and categorizing URLs, for example, while reddit collection is still ongoing).
+- // need to work on the code for collection - gather user info?  check back in on posts, comments?
+- Q - need a way to load JSON directly into django model instance, or is it OK to just load from ReddiWrapper objects?  For now, just using RediWrapper.

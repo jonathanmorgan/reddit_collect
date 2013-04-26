@@ -1,8 +1,15 @@
 #!/usr/bin/python
 
+#================================================================================
+# imports
+#================================================================================
+
+# base python libraries
 import time
 import sys
+import datetime
 
+# site-specific imports.
 site_path = '/home/socs/socs_reddit/'
 if site_path not in sys.path:
     sys.path.append( site_path )
@@ -24,6 +31,7 @@ class RedditCollector( object ):
     username = ""
     password = ""
     cookie_file_path = ""
+    do_manage_time = True
     
     
     #---------------------------------------------------------------------------
@@ -43,6 +51,9 @@ class RedditCollector( object ):
         self.username = ""
         self.password = ""
         self.cookie_file_path = ""
+        
+        # flag to say if this instance should manage time.
+        do_manage_time = True
 
     #-- END constructor --#
 
@@ -51,8 +62,49 @@ class RedditCollector( object ):
     # instance methods
     #============================================================================
     
+
+    def collect_from_all_subreddit(  self, *args, **kwargs ):
     
-    def create_reddiwrap_instance( self ):
+        '''
+        This method collects posts from the /r/all subreddit, which allows access
+           to the entire history of reddit.  Eventually, we will add parameters
+           to let you collect from or to a certain date, collect until you find a
+           certain post ID, etc.  For now, iteratively building up to that so we
+           can get our data.
+           
+        Postconditions: Stores each matching post to the database using django
+           model classes.  Returns a status message.
+        '''
+
+        # return reference
+        status_OUT = self.STATUS_SUCCESS
+        
+        # declare variables
+        me = "collect_from_all_subreddit"
+        reddiwrap = None
+        post_list = None
+        continue_collecting = True
+
+        # first, get reddiwrap instance
+        reddiwrap = self.get_reddiwrap_instance()
+        
+        # get first set of results for /r/all
+        post_list = reddiwrap.get( "/r/all/new?limit=100" )
+
+        # loop until flag is false
+        while continue_collecting == True:
+        
+            # for now, just fall out of loop.
+            continue_collecting = False
+            
+        #-- END loop --#
+        
+        return status_OUT
+    
+    #-- END method collect_from_all_subreddit() --#
+
+
+    def create_reddiwrap_instance( self, *args, **kwargs ):
     
         '''
         Creates and returns ReddiWrap instance for User Agent in this
@@ -146,7 +198,7 @@ class RedditCollector( object ):
     #-- END create_reddiwrap_instance() --#
 
 
-    def get_reddiwrap_instance( self ):
+    def get_reddiwrap_instance( self, *args, **kwargs ):
     
         '''
         If there is a reddiwrap instance already in this instance, returns it.
@@ -179,6 +231,93 @@ class RedditCollector( object ):
         return instance_OUT
     
     #-- END get_reddiwrap_instance() --#
+    
+    
+    def may_i_continue( self, last_transaction_dt_IN = None, *args, **kwargs ):
+    
+        '''
+        Accepts the last datetime.datetime of a transaction to reddit.  Compares
+           that to datetime.datetime.now().  If the difference is greater than
+           2 seconds, then returns True.  If not, waits the time between the
+           difference and 2 seconds and returns True.  Can't think of a reason to
+           return False at the moment, but perhaps, in the future, this could be
+           a semaphore, and so processes could loop waiting for True.
+           
+        Eventually, will change processing based on the value in do_manage_time -
+           if True, assume we are the only process.  If False, check a separate
+           ok_to_proceed flag, set by external manager, and only return True when
+           that flag has been set on this instance.
+           
+        Note: this will fail if interval between request and now() is exactly 24
+           hours (not checking day at the moment, just seconds and microseconds).
+        ''' 
+        
+        # return reference
+        value_OUT = False
+        
+        # declare variables
+        me = "may_i_continue"
+        last_request_dt = None
+        current_dt = None
+        difference_td = None
+        difference_seconds = -1
+        difference_microseconds = -1
+        sleep_seconds = -1.0
+        
+        # do we have a datetime passed in.
+        if ( ( last_transaction_dt_IN ) and ( last_transaction_dt_IN != None ) ):
+        
+            # yes.  Use it.
+            last_request_dt = last_transaction_dt_IN
+            
+        else:
+        
+            # no - just grab now().
+            last_request_dt = datetime.datetime.now()
+            
+        #-- END check to see if we have a datetime passed in. --#
+            
+        # get current date time.
+        current_dt = datetime.datetime.now()
+        
+        # date math - substract current from last_request.
+        difference_td = current_dt - last_request_dt
+        
+        # get difference in seconds
+        difference_seconds = difference_td.seconds
+        difference_microseconds = difference_td.microseconds
+        
+        # convert microseconds to seconds (divide by 1,000,000), add to
+        #    difference_seconds.
+        difference_seconds = difference_seconds + ( difference_microseconds / 1000000.0 )
+        
+        print( "In " + me + ": difference = " + str( difference_seconds ) )
+
+        # is difference greater than or equal to 2 seconds?
+        if ( difference_seconds >= 2 ):
+        
+            # yes - return True.
+            value_OUT = True
+            print( "In " + me + ": greater than 2 seconds - OK to continue." )
+            
+        else:
+            
+            # no - subtract difference from 2.
+            sleep_seconds = 2 - difference_seconds
+            
+            print( "In " + me + ": less than 2 seconds - sleep for " + str( sleep_seconds ) + " seconds." )
+
+            # sleep.
+            time.sleep( sleep_seconds )
+            
+            # set value_OUT
+            value_OUT = True
+            
+        #-- END check to see if we need to sleep. --#
+        
+        return value_OUT
+    
+    #-- END may_i_continue() --#
     
     
 #-- END class RedditCollector. --#

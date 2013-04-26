@@ -89,7 +89,7 @@ class Subreddit(models.Model):
 
         #-- END check to make sure instance passed in. --#
     
-    #-- END method import_from_reddiwrap --#
+    #-- END method set_fields_from_reddiwrap --#
 
 
 #-- END Subreddit model --#
@@ -157,13 +157,31 @@ class User(models.Model):
 
         #-- END check to make sure instance passed in. --#
     
-    #-- END method import_from_reddiwrap --#
+    #-- END method set_fields_from_reddiwrap --#
 
 
 #-- END User model --#
 
 
 class Post(models.Model):
+
+
+    #----------------------------------------------------------------------
+    # constants-ish
+    #----------------------------------------------------------------------
+
+
+    # comment collection statuses, for ongoing comment collection.
+    COMMENT_COLLECTION_STATUS_NEW = "new"
+    COMMENT_COLLECTION_STATUS_ONGOING = "ongoing"
+    COMMENT_COLLECTION_STATUS_DONE = "done"
+
+    COMMENT_COLLECTION_STATUS_CHOICES = (
+        ( COMMENT_COLLECTION_STATUS_NEW, 'New' ),
+        ( COMMENT_COLLECTION_STATUS_ONGOING, 'Ongoing' ),
+        ( COMMENT_COLLECTION_STATUS_DONE, 'Done' ),
+    )
+    
 
     #============================================================================
     # Django model fields.
@@ -205,6 +223,12 @@ class Post(models.Model):
     link_flair_text = models.TextField( null = True, blank = True )
     author_flair_class = models.TextField( null = True, blank = True )
     author_flair_text = models.TextField( null = True, blank = True )
+    
+    # comment collection
+    comment_collection_status = models.CharField( max_length = 255, choices = COMMENT_COLLECTION_STATUS_CHOICES, default = COMMENT_COLLECTION_STATUS_NEW )
+    comments_last_collected = models.DateTimeField( null = True, blank = True )
+    
+    # timestamps
     create_date = models.DateTimeField( auto_now_add = True )
     last_update = models.DateTimeField( auto_now = True )
 
@@ -243,7 +267,7 @@ class Post(models.Model):
             self.url = instance_IN.url                     # URL to post
             self.author_name = instance_IN.author          # Username of author
             self.domain = instance_IN.domain               # Domain posted ot
-            self.subreddit = instance_IN.subreddit         # Subreddit posted to
+            self.subreddit_name = instance_IN.subreddit         # Subreddit posted to
             self.subreddit_reddit_id = instance_IN.subreddit_id
             self.permalink = instance_IN.permalink         # Link to the post (including comments)
             self.is_self = BooleanHelper.convert_value_to_boolean( instance_IN.is_self ) # Self-post?
@@ -282,7 +306,7 @@ class Post(models.Model):
 
         #-- END check to make sure instance passed in. --#
     
-    #-- END method import_from_reddiwrap --#
+    #-- END method set_fields_from_reddiwrap --#
 
     
 #-- END Post model --#
@@ -382,7 +406,7 @@ class Comment( models.Model ):
 
         #-- END check to make sure instance passed in. --#
     
-    #-- END method import_from_reddiwrap --#
+    #-- END method set_fields_from_reddiwrap --#
 
 
 #-- END Comment model --#
