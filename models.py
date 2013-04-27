@@ -9,12 +9,14 @@
 from __future__ import unicode_literals
 
 from django.db import models
+import django.utils.encoding
 
 # reddiwrap reddit API library
 # import reddiwrap.ReddiWrap
 
 # python_utilities
 from python_utilities.booleans.boolean_helper import BooleanHelper
+from python_utilities.strings.string_helper import StringHelper
 
 # python libraries
 import datetime
@@ -255,7 +257,7 @@ class Post(models.Model):
         '''
     
         # declare variables
-        test = False
+        unicode_error_string = ""
         
         # got an instance passed in?
         if ( ( instance_IN ) and ( instance_IN != None ) ):
@@ -263,7 +265,7 @@ class Post(models.Model):
             self.modhash = instance_IN.modhash             # base36 string for communicating with account
             self.reddit_id = instance_IN.id                # base36 id for a post (usually 5 characters)
             self.name = instance_IN.name                   # example: t1_czwe3. t# is content type, the rest is the ID
-            self.title = instance_IN.title                 # Title of post
+            self.title = django.utils.encoding.smart_text( instance_IN.title ).encode( 'ascii', 'xmlcharrefreplace' )                 # Title of post
             self.url = instance_IN.url                     # URL to post
             self.author_name = instance_IN.author          # Username of author
             self.domain = instance_IN.domain               # Domain posted ot
@@ -271,8 +273,8 @@ class Post(models.Model):
             self.subreddit_reddit_id = instance_IN.subreddit_id
             self.permalink = instance_IN.permalink         # Link to the post (including comments)
             self.is_self = BooleanHelper.convert_value_to_boolean( instance_IN.is_self ) # Self-post?
-            self.selftext = instance_IN.selftext           # Self-post text
-            self.selftext_html = instance_IN.selftext_html # HTML for self-post text
+            self.selftext = django.utils.encoding.smart_text( instance_IN.selftext ).encode( 'ascii', 'xmlcharrefreplace' )         # Self-post text
+            self.selftext_html = django.utils.encoding.smart_text( instance_IN.selftext_html ).encode( 'ascii', 'xmlcharrefreplace' ) # HTML for self-post text
             self.num_comments = instance_IN.num_comments   # Number of comments
             self.score = instance_IN.score                 # upvotes - downvotes * crazy reddit vote fuzzing constant
             self.upvotes = instance_IN.upvotes
@@ -287,7 +289,7 @@ class Post(models.Model):
             self.approved_by = instance_IN.approved_by
             self.link_flair_text = instance_IN.link_flair_text
             self.link_flair_class = instance_IN.link_flair_class # link_flair_css_class": null,
-            self.author_flair_text = instance_IN.author_flair_text # "author_flair_css_class": null,
+            self.author_flair_text = django.utils.encoding.smart_text( instance_IN.author_flair_text ).encode( 'ascii', 'xmlcharrefreplace' )
             self.author_flair_class = instance_IN.author_flair_class
             self.clicked = BooleanHelper.convert_value_to_boolean( instance_IN.clicked ) # If logged-in user has clicked link yet
             self.hidden = BooleanHelper.convert_value_to_boolean( instance_IN.hidden )

@@ -15,10 +15,24 @@ if site_path not in sys.path:
     sys.path.append( site_path )
 
 import myLib
+import reddit_collect.models
+
+# python_utilities
+from python_utilities.rate_limited.basic_rate_limited import BasicRateLimited
+
+# ReddiWrapper
 from reddiwrap.ReddiWrap import ReddiWrap
 
+class RedditCollector( BasicRateLimited ):
 
-class RedditCollector( object ):
+
+    #============================================================================
+    # CONSTANTS-ish
+    #============================================================================
+
+
+    STATUS_SUCCESS = "Success!"
+    STATUS_PREFIX_ERROR = "ERROR: "
 
 
     #============================================================================
@@ -31,7 +45,11 @@ class RedditCollector( object ):
     username = ""
     password = ""
     cookie_file_path = ""
-    do_manage_time = True
+    
+    # rate limiting - in parent class BasicRateLimited.
+    #do_manage_time = True
+    #rate_limit_in_seconds = 2
+    #request_start_time = None
     
     
     #---------------------------------------------------------------------------
@@ -54,6 +72,8 @@ class RedditCollector( object ):
         
         # flag to say if this instance should manage time.
         do_manage_time = True
+        rate_limit_in_seconds = 2
+        request_start_time = None
 
     #-- END constructor --#
 
@@ -63,7 +83,16 @@ class RedditCollector( object ):
     #============================================================================
     
 
-    def collect_from_all_subreddit(  self, *args, **kwargs ):
+    def collect_posts(  self, 
+                        subreddit_IN = "all",
+                        post_count_limit_IN = -1,
+                        until_id_IN = "",
+                        until_date_IN = None,
+                        subreddit_in_list_IN = [],
+                        after_id_IN = None,
+                        before_id_IN = None,
+                        *args,
+                        **kwargs ):
     
         '''
         This method collects posts from the /r/all subreddit, which allows access
@@ -71,6 +100,18 @@ class RedditCollector( object ):
            to let you collect from or to a certain date, collect until you find a
            certain post ID, etc.  For now, iteratively building up to that so we
            can get our data.
+           
+        Parameters:
+        - subreddit_IN - defaults to "all". Subreddit you want to collect from.
+        - post_count_limit_IN - number of posts we want to collect.
+        - until_id_IN - value of ID we collect until we encounter in the stream (should include type - so begin with "t3_").
+        - until_date_IN - datetime instance of UTC/GMT date and time we want to collect to (will stop collecting once a date after this is encountered).
+        - subreddit_in_list_IN - list of subreddits to limit our collection to (each should begin with "t5_").
+        - after_id_IN - ID you want to get posts after.  Must include type (start with "t3_").
+        - before_id_IN - ID before which you want posts.  Must include type (start with "t3_").
+        
+        Parameters to come (TK):
+        - start_date_IN - datetime instance of date and time after which we want to collect (will ignore until a post is greater-than-or-equal to this date).
            
         Postconditions: Stores each matching post to the database using django
            model classes.  Returns a status message.
@@ -82,26 +123,226 @@ class RedditCollector( object ):
         # declare variables
         me = "collect_from_all_subreddit"
         reddiwrap = None
+        post_count = -1
+        api_url = ""
         post_list = None
         continue_collecting = True
+        current_rw_post = None
+        current_post_reddit_id = ""
+        current_post_created = ""
+        current_post_created_dt = None
+        current_post_subreddit_id = ""
 
-        # first, get reddiwrap instance
-        reddiwrap = self.get_reddiwrap_instance()
+        # variables for storing post in database.
+        django_post = None
         
-        # get first set of results for /r/all
-        post_list = reddiwrap.get( "/r/all/new?limit=100" )
+        # variables for exception handling.
+        exception_type = ""
+        exception_value = ""
+        exception_traceback = ""
 
+        # get reddiwrap instance
+        reddiwrap = self.get_reddiwrap_instance()
+
+        # initialize variables
+        post_count = 0
+
+        # create URL - first, add in reddit, limit.
+        api_url = "/r/%s/new?limit=100" % subreddit_IN
+        
+        # ! TODO - add ability to add parameterized limit and after, before IDs to
+        #    URL.
+        # after param?
+        if ( ( after_id_IN ) and ( after_id_IN != None ) and ( after_id_IN != "" ) ):
+        
+            # yes.  Add it to the URL.
+            api_url += "&after=" + after_id_IN
+        
+        #-- END check to see if after ID passed in. --#
+        
+        # before param?
+        if ( ( before_id_IN ) and ( before_id_IN != None ) and ( before_id_IN != "" ) ):
+        
+            # yes.  Add it to the URL.
+            api_url += "&before=" + before_id_IN
+        
+        #-- END check to see if after ID passed in. --#
+        
         # loop until flag is false
         while continue_collecting == True:
         
-            # for now, just fall out of loop.
-            continue_collecting = False
+            print( "In " + me + ": top of loop, latest post = " + current_post_reddit_id + ", number " + str( post_count ) + "." )
+
+            # set request start time (OK to be a little inefficient)
+            self.start_request()
+
+            # get first set of results, or grab next set of results.
+            if ( post_count == 0 ):
+
+                # get first set of results for /r/all
+                post_list = reddiwrap.get( api_url )
+                
+            else:
             
-        #-- END loop --#
+                # get next set of posts.
+                post_list = reddiwrap.get_next()
+
+            #-- END check to see how we grab more posts. --#
+        
+            # loop over posts.
+            for current_rw_post in post_list:
+
+                # increment post counter.
+                post_count += 1
+            
+                # get info. on current post.
+                current_post_reddit_id = current_rw_post.id
+                current_post_id_with_type = "t3_" + current_post_reddit_id
+                current_post_created = current_rw_post.created_utc
+                current_post_created_dt = datetime.datetime.fromtimestamp( int( current_post_created ) )
+                current_post_subreddit_id = current_rw_post.subreddit_id
+                
+                #----------------------------------------------------------------
+                # conditions for stopping collection
+                #----------------------------------------------------------------
+                
+                # do we have a post count limit?
+                if ( ( post_count_limit_IN ) and ( post_count_limit_IN > 0 ) ):
+                
+                    # yes - has post count exceded this count?
+                    if ( post_count > post_count_limit_IN ):
+                    
+                        # it is.  stop.
+                        continue_collecting = False
+                        print( "In " + me + ": reddit post " + current_post_reddit_id + " is post number " + str( post_count ) + ", putting us over our limit of " + str( post_count_limit_IN ) + ".  Stopping collection." )
+                        
+                    #-- END check to see if current post puts us over our post limit. --#
+                
+                #-- END check for post count limit. --#
+                
+                # do we have an until ID?
+                if ( ( until_id_IN ) and ( until_id_IN != "" ) ):
+                
+                    # is current ID the until ID?
+                    if ( current_post_reddit_id == until_id_IN ):
+                    
+                        # it is.  stop.
+                        continue_collecting = False
+                        print( "In " + me + ": reddit post " + current_post_reddit_id + " is our until post ( " + until_id_IN + " ).  Stopping collection." )
+                        
+                    #-- END check to see if current post is post at which we are to stop. --#
+                
+                #-- END check for until ID. --#
+                
+                # do we have an until date?
+                if ( ( until_date_IN ) and ( until_date_IN != None ) ):
+                
+                    #-- we have an until date...  is current date less than until date?
+                    if ( current_post_created_dt < until_date_IN ):
+                    
+                        # it is.  stop.
+                        continue_collecting = False
+                        print( "In " + me + ": reddit post " + current_post_reddit_id + " has date " + str( current_post_created_dt ) + " that is past our until date.  Stopping collection." )
+                    
+                    #-- END check to see if post's date is past the cutoff. --#
+                
+                #-- END check to see if we have an until date --#
+
+                #----------------------------------------------------------------
+                # collection logic
+                #----------------------------------------------------------------
+                
+                # do we continue collecting?
+                if ( continue_collecting == True ):
+
+                    # Only process if either there is no subreddit list, or the
+                    #    subreddit is in the list.
+                    if ( ( len( subreddit_in_list_IN ) <= 0 ) or ( current_post_subreddit_id in subreddit_in_list_IN ) ):
+                    
+                        # post already in database?
+                        try:
+                    
+                            # lookup post.
+                            django_post = reddit_collect.models.Post.objects.get( reddit_id = current_post_reddit_id )
+        
+                            print( "In " + me + ": reddit post " + current_post_reddit_id + " is already in database - moving on." )
+                        
+                        except:
+                        
+                            # Not found.  Set to None.
+                            django_post = None
+                        
+                        #-- END - check for post in database --#
+                        
+                        # Got existing?  (Could put this in except, still not
+                        #    sure how I feel about using exceptions for program
+                        #    flow)
+                        if ( django_post == None ):
+        
+                            # not in database.  Add it.
+                            django_post = reddit_collect.models.Post()
+                            
+                            # set fields from reddiwrap post instance.
+                            django_post.set_fields_from_reddiwrap( current_rw_post )
+                            
+                            # exception handling around save, to deal with encoding (!).
+                            try:
+                            
+                                # save to database.
+                                django_post.save()
+                                
+                            except Exception, e:
+                            
+                                # error saving.  Probably encoding error.
+
+                                # get exception details:
+                                exception_type, exception_value, exception_traceback = sys.exc_info()
+
+                                # output
+                                print( "===> In " + me + ": reddit post " + current_post_reddit_id + " threw exception on save." )
+                                print( "     - args = " + str( e.args ) )
+                                print( "     - type = " + str( exception_type ) )
+                                print( "     - value = " + str( exception_value ) )
+                                print( "     - traceback = " + str( exception_traceback ) )
+                                
+                                # send email to let me know this crashed?
+
+                                # throw exception?
+                                raise( e )
+                                
+                            #-- END try-except around save() --#
+                                
+                        #-- END check to see if already in database --#
+                        
+                    #-- END check to see if subreddit list indicates we should process this post. --#
+                    
+                #-- END check to see if we continue collecting --#
+            
+            #-- END loop over current set of posts. --#
+
+            # if we haven't already decided to stop, check if we can continue.
+            if ( continue_collecting == True ):
+            
+                # no reason to stop yet...  Do we have more posts?                
+                if ( reddiwrap.has_next() == False ):
+            
+                    # no - do not continue.
+                    continue_collecting = False
+                
+                else:
+            
+                    # see if we are allowed to continue.
+                    continue_collecting = self.may_i_continue()
+                    
+                #-- END checks to see if we continue collecting. --#
+
+            #-- END check to see if we continue collecting. --#
+            
+        #-- END outer reddit collection loop --#
         
         return status_OUT
     
-    #-- END method collect_from_all_subreddit() --#
+    #-- END method collect_posts_from_subreddit() --#
 
 
     def create_reddiwrap_instance( self, *args, **kwargs ):
@@ -231,93 +472,6 @@ class RedditCollector( object ):
         return instance_OUT
     
     #-- END get_reddiwrap_instance() --#
-    
-    
-    def may_i_continue( self, last_transaction_dt_IN = None, *args, **kwargs ):
-    
-        '''
-        Accepts the last datetime.datetime of a transaction to reddit.  Compares
-           that to datetime.datetime.now().  If the difference is greater than
-           2 seconds, then returns True.  If not, waits the time between the
-           difference and 2 seconds and returns True.  Can't think of a reason to
-           return False at the moment, but perhaps, in the future, this could be
-           a semaphore, and so processes could loop waiting for True.
-           
-        Eventually, will change processing based on the value in do_manage_time -
-           if True, assume we are the only process.  If False, check a separate
-           ok_to_proceed flag, set by external manager, and only return True when
-           that flag has been set on this instance.
-           
-        Note: this will fail if interval between request and now() is exactly 24
-           hours (not checking day at the moment, just seconds and microseconds).
-        ''' 
-        
-        # return reference
-        value_OUT = False
-        
-        # declare variables
-        me = "may_i_continue"
-        last_request_dt = None
-        current_dt = None
-        difference_td = None
-        difference_seconds = -1
-        difference_microseconds = -1
-        sleep_seconds = -1.0
-        
-        # do we have a datetime passed in.
-        if ( ( last_transaction_dt_IN ) and ( last_transaction_dt_IN != None ) ):
-        
-            # yes.  Use it.
-            last_request_dt = last_transaction_dt_IN
-            
-        else:
-        
-            # no - just grab now().
-            last_request_dt = datetime.datetime.now()
-            
-        #-- END check to see if we have a datetime passed in. --#
-            
-        # get current date time.
-        current_dt = datetime.datetime.now()
-        
-        # date math - substract current from last_request.
-        difference_td = current_dt - last_request_dt
-        
-        # get difference in seconds
-        difference_seconds = difference_td.seconds
-        difference_microseconds = difference_td.microseconds
-        
-        # convert microseconds to seconds (divide by 1,000,000), add to
-        #    difference_seconds.
-        difference_seconds = difference_seconds + ( difference_microseconds / 1000000.0 )
-        
-        print( "In " + me + ": difference = " + str( difference_seconds ) )
-
-        # is difference greater than or equal to 2 seconds?
-        if ( difference_seconds >= 2 ):
-        
-            # yes - return True.
-            value_OUT = True
-            print( "In " + me + ": greater than 2 seconds - OK to continue." )
-            
-        else:
-            
-            # no - subtract difference from 2.
-            sleep_seconds = 2 - difference_seconds
-            
-            print( "In " + me + ": less than 2 seconds - sleep for " + str( sleep_seconds ) + " seconds." )
-
-            # sleep.
-            time.sleep( sleep_seconds )
-            
-            # set value_OUT
-            value_OUT = True
-            
-        #-- END check to see if we need to sleep. --#
-        
-        return value_OUT
-    
-    #-- END may_i_continue() --#
     
     
 #-- END class RedditCollector. --#

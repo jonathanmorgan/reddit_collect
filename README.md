@@ -93,6 +93,16 @@ This code collects and stores data from reddit in a database, using django ORM m
                     }
                 }
 
+### Set up database
+
+- Once database is configured in settings.py, in your site directory, run "python manage.py syncdb" to create database tables.
+    
+- For each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8 and utf8_unicode_ci.  Here is SQL for the columns I've had to change thus far:
+    
+        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `author_flair_text` `author_flair_text` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `title` `title` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext` `selftext` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext_html` `selftext_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
 
 ## Usage
 
@@ -130,6 +140,22 @@ This code collects and stores data from reddit in a database, using django ORM m
     # just want a ReddiWrap instance?
     reddiwrap = reddit_collector.create_reddiwrap_instance()
     
+    # collect latest 10 entries from /r/all, store them in database.
+    reddit_collector.collect_posts( 10 )
+    
+    # collect posts until you get to ID 1d64j4
+    reddit_collector.collect_posts( -1, "t3_1d64j4" )
+    
+    # OR, posts through ID 1d68lz
+    reddit_collector.collect_posts( until_id_IN = "t3_1d68lz" )
+    
+    # collect posts through date - start of 2013/04/26
+    test_date = datetime.datetime( 2013, 4, 26, 0, 0, 0, 0 )
+    reddit_collector.collect_posts( until_date_IN = test_date )
+    
+    # combine arguments to pick up where you left off.
+    reddit_collector.collect_posts( until_date_IN = test_date, after_id_IN = "t3_1d63sm" )
+    
 ### Reddiwrap Usage
 
     # search /r/all for posts from a specific sub-reddit
@@ -139,7 +165,7 @@ This code collects and stores data from reddit in a database, using django ORM m
     while ( reddiwrap.has_next() == True ):
     
         # make sure you don't go over 2 transactions per second.
-        reddiwrap.get_next()
+        post_list = reddiwrap.get_next()
     
     #-- END iteration over search results --#
     
@@ -178,3 +204,5 @@ This code collects and stores data from reddit in a database, using django ORM m
 - // need mysql so we can have concurrency (scanning for and categorizing URLs, for example, while reddit collection is still ongoing).
 - // need to work on the code for collection - gather user info?  check back in on posts, comments?
 - Q - need a way to load JSON directly into django model instance, or is it OK to just load from ReddiWrapper objects?  For now, just using RediWrapper.
+- test if the reddiwrap post instances have comments nested (I think they don't).
+- * look at using bulk_create() to insert the Posts into the database instead of saving each (1 query instead of 100 for each set of 100... should be much better).
