@@ -156,6 +156,9 @@ This code collects and stores data from reddit in a database, using django ORM m
     # combine arguments to pick up where you left off.
     reddit_collector.collect_posts( until_date_IN = test_date, after_id_IN = "t3_1d63sm" )
     
+    # or combine to test - just 350 posts, no more.
+    reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
+    
 ### Reddiwrap Usage
 
     # search /r/all for posts from a specific sub-reddit

@@ -12,7 +12,7 @@ from django.db import models
 import django.utils.encoding
 
 # reddiwrap reddit API library
-# import reddiwrap.ReddiWrap
+import reddiwrap.ReddiWrap
 
 # python_utilities
 from python_utilities.booleans.boolean_helper import BooleanHelper
@@ -63,7 +63,7 @@ class Subreddit(models.Model):
     def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
     
         '''
-        Accepts a reddiwrap Comment instance.  Uses it to populate this instance.
+        Accepts a reddiwrap Subreddit instance.  Uses it to populate this instance.
         '''
     
         # declare variables
@@ -253,7 +253,7 @@ class Post(models.Model):
     def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
     
         '''
-        Accepts a reddiwrap Comment instance.  Uses it to populate this instance.
+        Accepts a reddiwrap Post instance.  Uses it to populate this instance.
         '''
     
         # declare variables
@@ -311,6 +311,69 @@ class Post(models.Model):
     #-- END method set_fields_from_reddiwrap --#
 
     
+    def create_reddiwrap_post( self, *args, **kwargs ):
+    
+        '''
+        Creates a reddiwrap Post instance, populates it from this instance,
+           returns the result.
+        '''
+    
+        # return reference
+        instance_OUT = None
+    
+        # declare variables
+        
+        # create instance
+        instance_OUT = reddiwrap.ReddiWrap.Post()
+
+        # populate instance.        
+        instance_OUT.modhash = self.modhash             # base36 string for communicating with account
+        instance_OUT.id = self.reddit_id                # base36 id for a post (usually 5 characters)
+        instance_OUT.name = self.name                   # example: t1_czwe3. t# is content type, the rest is the ID
+        instance_OUT.title = self.title                 # Title of post
+        instance_OUT.url = self.url                     # URL to post
+        instance_OUT.author = self.author_name          # Username of author
+        instance_OUT.domain = self.domain               # Domain posted ot
+        instance_OUT.subreddit = self.subreddit_name    # Subreddit posted to
+        instance_OUT.subreddit_id = self.subreddit_reddit_id
+        instance_OUT.permalink = self.permalink         # Link to the post (including comments)
+        instance_OUT.is_self = self.is_self             # Self-post?
+        instance_OUT.selftext = self.selftext           # Self-post text
+        instance_OUT.selftext_html = self.selftext_html # HTML for self-post text
+        instance_OUT.num_comments = self.num_comments   # Number of comments
+        instance_OUT.score = self.score                 # upvotes - downvotes * crazy reddit vote fuzzing constant
+        instance_OUT.upvotes = self.upvotes
+        instance_OUT.downvotes = self.downvotes
+        instance_OUT.over_18 = self.over_18 # NSFW post
+        instance_OUT.created = self.created
+        instance_OUT.created_utc = self.created_utc
+        instance_OUT.num_reports = self.num_reports
+        instance_OUT.banned_by = self.banned_by
+        instance_OUT.approved_by = self.approved_by
+        instance_OUT.link_flair_text = self.link_flair_text
+        instance_OUT.link_flair_class = self.link_flair_class # link_flair_css_class": null,
+        instance_OUT.author_flair_text = self.author_flair_text
+        instance_OUT.author_flair_class = self.author_flair_class
+        instance_OUT.clicked = self.clicked # If logged-in user has clicked link yet
+        instance_OUT.hidden = self.hidden
+        instance_OUT.saved = self.saved
+        instance_OUT.edited = self.edited
+
+        # what to do with these?
+        '''
+        self.comments      = [] # List of Comment objects that are replies to the Post
+        self.has_more_comments = False # Contains comments that have not been loaded
+        self.more_comments     = ''    # JSON data containing information about comments to load
+        self.media_embed   = {}
+        self.media         = None
+        self.thumbnail     = ''
+        '''
+
+        return instance_OUT
+    
+    #-- END method create_reddiwrap_post --#
+
+
 #-- END Post model --#
 
 
