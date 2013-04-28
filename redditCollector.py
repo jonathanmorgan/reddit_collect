@@ -157,6 +157,7 @@ class RedditCollector( BasicRateLimited ):
         post_counter = 0
         comment_create_count = 0
         django_do_bulk_create = False
+        django_bulk_create_list = []
         django_bulk_create_count = 0
         start_dt = datetime.datetime.now()
 
@@ -185,6 +186,10 @@ class RedditCollector( BasicRateLimited ):
                 # increment post counter
                 post_counter += 1
                 
+                # memory management.
+                gc.collect()
+                django.db.reset_queries()
+    
                 # set request start time (OK to be a little inefficient)
                 self.start_request()
 
@@ -194,84 +199,56 @@ class RedditCollector( BasicRateLimited ):
                 # use reddiwrap to load comments.
                 reddiwrap.fetch_comments( current_rw_post );
                 
-                # process comment list (recursive)
-                django_current_create_count = self.process_comments( current_post, current_rw_post.comments )
+                # bulk?
+                if ( django_do_bulk_create == True ):
                 
-                # increment total count
-                comment_create_count += django_current_create_count
-                
-                '''
-                django_comment_create_list = self.process_comments( current_post, current_rw_post.comments )
+                    # process comment list in bulk (recursive)
+                    django_bulk_create_list = self.process_comments_bulk( current_post, current_rw_post.comments )
+                    
+                    # do bulk_create()?
+                    if ( ( django_bulk_create_list ) and ( len( django_bulk_create_list ) > 0 ) ):
+                    
+                        # try/except around saving.
+                        try:
+        
+                            # yes.
+                            reddit_collect.models.Comment.objects.bulk_create( django_bulk_create_list )
+                            
+                            # increment total count
+                            django_bulk_create_count = len( django_bulk_create_list )
+                            comment_create_count += django_bulk_create_count
 
-                # got any comments?
-                django_current_create_count = len( django_comment_create_list )
-                if ( django_current_create_count > 0 ):
-                
-                    # try/except around saving.
-                    try:
-    
-                        # bulk_create?
-                        if ( django_do_bulk_create == True ):
-                        
-                            # pass the list to bulk_create().
-                            reddit_collect.models.Comment.objects.bulk_create( django_comment_create_list )
+                        except Exception, e:
                             
-                            # update comment create count
-                            comment_create_count += django_current_create_count
+                            # error saving.  Probably encoding error.
+        
+                            # get exception details:
+                            exception_type, exception_value, exception_traceback = sys.exc_info()
+                            print( "====> In " + me + ": bulk_create() threw exception, processing comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); count of comments being bulk created = " + str( django_bulk_create_count ) )
+                            print( "      - args = " + str( e.args ) )
+                            print( "      - type = " + str( exception_type ) )
+                            print( "      - value = " + str( exception_value ) )
+                            print( "      - traceback = " + str( exception_traceback ) )
                             
-                        else:
-                        
-                            # loop over the list, saving each individually.
-                            for current_comment in django_comment_create_list:
-                            
-                                # save the comment.
-                                current_comment.save()
+                            # send email to let me know this crashed?
+        
+                            # throw exception?
+                            raise( e )
+                                
+                        #-- END try/except around saving. --#
 
-                                # update comment create count
-                                comment_create_count += 1
-                            
-                            #-- END loop over comments --#
-                        
-                        #-- END check to see if bulk create or not. --#
-    
-                    except Exception, e:
-                        
-                        # error saving.  Probably encoding error.
-    
-                        # get exception details:
-                        exception_type, exception_value, exception_traceback = sys.exc_info()
-    
-                        # output
-                        if ( django_do_bulk_create == True ):
-                        
-                            print( "====> In " + me + ": bulk_create() threw exception, processing comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); count of comments being bulk created = " + str( django_current_create_count ) )
-                        
-                        else:
-    
-                            print( "====> In " + me + ": reddit post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ), comment " + current_comment.reddit_id + " threw exception on save()." )
-                            
-                        #-- END check to see if bulk_create --#
-                        
-                        print( "      - args = " + str( e.args ) )
-                        print( "      - type = " + str( exception_type ) )
-                        print( "      - value = " + str( exception_value ) )
-                        print( "      - traceback = " + str( exception_traceback ) )
-                        
-                        # send email to let me know this crashed?
-    
-                        # throw exception?
-                        raise( e )
-                            
-                    #-- END try/except around saving. --#
+                    #-- END check to see if anything to bulk create. --#
                     
                 else:
                 
-                    # no comments.  Just pass for now.
-                    pass
+                    # process comment list (recursive)
+                    django_current_create_count = self.process_comments( current_post, current_rw_post.comments )
                 
-                #-- END check to see if any comments. --#
-                '''
-            
+                    # increment total count
+                    comment_create_count += django_current_create_count
+                    
+                #-- END check to see if bulk or not. --#
+                            
             #-- END check to see if we are OK to continue collecting. --#
         
         #-- END loop over posts. --#
@@ -816,7 +793,10 @@ class RedditCollector( BasicRateLimited ):
            each, then checking for child comments.  If child(ren) found, calls
            this routine again, also passing parent comment, so they reference
            both root parent post and parent comment.  Returns count of comments
-           created.
+           created.  This method creates all django relations as well as storing
+           IDs from reddit.  The process_comments_bulk() method stores reddit IDs
+           so comment relations can be pieced together, but doesn't create django
+           relations, as well.
                    
         Parameters:
         - post_IN - reddit_collect.models.Post instance, so we can relate comments to their post.
@@ -828,16 +808,244 @@ class RedditCollector( BasicRateLimited ):
         comment_count_OUT = 0
         
         # declare variables
+        me = "process_comments"
+        comment_count = -1
+        new_comment_count = -1
+        current_rw_comment = None
+        comment_reddit_full_id = ""
+        django_comment = None
+        django_do_bulk_create = False
+        comment_children = None
+        child_count = -1
         
+        # initialize variables
+        comment_count = 0
+        
+        # do we have a comment list
+        if ( ( comment_list_IN ) and ( len( comment_list_IN ) > 0 ) ):
+        
+            # we have comments.  Loop over them.
+            for current_rw_comment in comment_list_IN:
+            
+                # increment count
+                comment_count += 1
+                
+                # get the full ID
+                comment_reddit_full_id = current_rw_comment.name
+            
+                # ==> comment already in database?
+                try:
+            
+                    # lookup comment.
+                    django_comment = reddit_collect.models.Comment.objects.get( reddit_full_id = comment_reddit_full_id )
+
+                    print( "In " + me + ": reddit comment " + comment_reddit_full_id + " is already in database - moving on." )
+                
+                except:
+                
+                    # Not found.  Set to None.
+                    django_comment = None
+                
+                #-- END - check for comment in database --#
+                
+                # !TODO - update as well as create?
+                
+                # ==> Got existing?  (Could put this in except, still not
+                #    sure how I feel about using exceptions for program
+                #    flow)
+                if ( django_comment == None ):
+
+                    # not in database.  Add it.
+                    new_comment_count += 1
+                    
+                    # create model instance.
+                    django_comment = reddit_collect.models.Comment()
+                    
+                    # set fields from reddiwrap instance.
+                    django_comment.set_fields_from_reddiwrap( current_rw_comment )
+                    
+                    # if post, set post (better be a post).
+                    if ( ( post_IN ) and ( post_IN != None ) ):
+
+                        django_comment.post = post_IN
+                        
+                    #-- END check to see if related post passed in. --#
+                    
+                    # if parent comment, set it.
+                    if ( ( parent_comment_IN ) and ( parent_comment_IN != None ) ):
+                    
+                        django_comment.parent = parent_comment_IN
+                    
+                    #-  END check to see if parent_comment_IN --#
+                    
+                    # exception handling around save, to deal with encoding (!).
+                    try:
+                    
+                        # save to database.
+                        django_comment.save()
+                        
+                    except Exception, e:
+                    
+                        # error saving.  Probably encoding error.
+
+                        # get exception details:
+                        exception_type, exception_value, exception_traceback = sys.exc_info()
+
+                        # output
+                        print( "====> In " + me + ": reddit post " + current_post_reddit_id + " threw exception on save()." )
+                        print( "      - args = " + str( e.args ) )
+                        print( "      - type = " + str( exception_type ) )
+                        print( "      - value = " + str( exception_value ) )
+                        print( "      - traceback = " + str( exception_traceback ) )
+                        
+                        # send email to let me know this crashed?
+
+                        # throw exception?
+                        raise( e )
+                        
+                    #-- END try-except around save() --#
+                        
+                #-- END check to see if already in database --#
+
+                # does current comment have children?
+                comment_children = current_rw_comment.children
+                if ( ( comment_children ) and ( len( comment_children ) > 0 ) ):
+                
+                    # yes.  Recurse!
+                    child_count = self.process_comments( post_IN, comment_children, django_comment )
+                    
+                    # add child count to comment_count
+                    comment_count += child_count
+                
+                #-- END check to see if there are comments --#
+            
+            #-- END loop over comments. --#
+        
+        #-- END check to see if comments. --#
         
         return comment_count_OUT
     
     #-- END method process_comments --#
     
     
+    def process_comments_bulk( self, post_IN = None, comment_list_IN = [], *args, **kwargs ):
+        
+        '''
+        Accepts django reddit_collect.models.Post instance, list of reddiwrap
+           comment instances.  Loops over all comments in the list, processing
+           each, then checking for child comments.  If child(ren) found, calls
+           this routine again, passing post and list of children, so they
+           reference root parent post.  Returns list of comments
+           that need to be bulk saved.  This method stores reddit IDs so comment
+           relations can be pieced together, but doesn't create django relations,
+           as well.  The process_comments_bulk() method creates all django
+           relations as well as storing IDs from reddit.  Lots more queries,
+           though.
+                   
+        Parameters:
+        - post_IN - reddit_collect.models.Post instance, so we can relate comments to their post.
+        - comment_list_IN - list of reddiwrap Comment instances we are to store in the database.
+        '''
+    
+        # return reference
+        comment_list_OUT = []
+        
+        # declare variables
+        me = "process_comments"
+        comment_count = -1
+        new_comment_count = -1
+        current_rw_comment = None
+        comment_reddit_full_id = ""
+        django_comment = None
+        django_do_bulk_create = False
+        comment_children = None
+        child_comment_list = []
+        
+        # initialize variables
+        comment_count = 0
+        
+        # do we have a comment list
+        if ( ( comment_list_IN ) and ( len( comment_list_IN ) > 0 ) ):
+        
+            # we have comments.  Loop over them.
+            for current_rw_comment in comment_list_IN:
+            
+                # increment count
+                comment_count += 1
+                
+                # get the full ID
+                comment_reddit_full_id = current_rw_comment.name
+            
+                # ==> comment already in database?
+                try:
+            
+                    # lookup comment.
+                    django_comment = reddit_collect.models.Comment.objects.get( reddit_full_id = comment_reddit_full_id )
+
+                    print( "In " + me + ": reddit comment " + comment_reddit_full_id + " is already in database - moving on." )
+                
+                except:
+                
+                    # Not found.  Set to None.
+                    django_comment = None
+                
+                #-- END - check for comment in database --#
+                
+                # !TODO - update as well as create?
+                
+                # ==> Got existing?  (Could put this in except, still not
+                #    sure how I feel about using exceptions for program
+                #    flow)
+                if ( django_comment == None ):
+
+                    # not in database.  Add it.
+                    new_comment_count += 1
+                    
+                    # create model instance.
+                    django_comment = reddit_collect.models.Comment()
+                    
+                    # set fields from reddiwrap instance.
+                    django_comment.set_fields_from_reddiwrap( current_rw_comment )
+                    
+                    # if post, set post (better be a post).
+                    if ( ( post_IN ) and ( post_IN != None ) ):
+
+                        django_comment.post = post_IN
+                        
+                    #-- END check to see if related post passed in. --#
+                    
+                    # append instance to list
+                    comment_list_OUT.append( django_comment )
+                    
+                #-- END check to see if already in database --#
+
+                # does current comment have children?
+                comment_children = current_rw_comment.children
+                if ( ( comment_children ) and ( len( comment_children ) > 0 ) ):
+                
+                    # yes.  Recurse!
+                    child_comment_list = self.process_comments_bulk( post_IN, comment_children )
+                    
+                    # add instances in child list to the return list.
+                    comment_list_OUT.extend( child_comment_list )
+                
+                #-- END check to see if there are child comments --#
+            
+            #-- END loop over comments. --#
+        
+        #-- END check to see if comments. --#
+        
+        return comment_list_OUT
+    
+    #-- END method process_comments_bulk --#
+    
+    
 #-- END class RedditCollector. --#
 
 '''
+#================================================================================
+# Original Code
+#================================================================================
 
 reddit = ReddiWrap(user_agent='ReddiWrap')
 

@@ -14,11 +14,11 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 - in your work directory, create a django site.
 
-        django-admin.py startproject socs_reddit
+        django-admin.py startproject <site_directory>
     
-- cd into the reddit directory
+- cd into the site_directory
 
-        cd socs_reddit
+        cd <site_directory>
     
 - pull in reddiwrap
 
@@ -32,15 +32,11 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         git clone ssh://<username>@data.jrn.cas.msu.edu/home/socs/git/reddit_collect.git
     
-- cd back to the site's root directory
-
-        cd ..
-    
 ### Configure settings.py
 
-- cd into the site configuration directory, where settings.py is located (it is named the same as your site directory, but inside your site directory, alongside all the other django code you pulled in from git).
+- from the site_directory, cd into the site configuration directory, where settings.py is located (it is named the same as site_directory, but nested inside site_directory, alongside all the other django code you pulled in from git - <site_directory>/<same_name_as_site_directory>).
 
-        cd socs_reddit
+        cd <same_name_as_site_directory>
 
 - in settings.py, set USE_TZ to false to turn off time zone support:
 
@@ -106,11 +102,22 @@ This code collects and stores data from reddit in a database, using django ORM m
             ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext` `selftext` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
             ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext_html` `selftext_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
 
+    - columns on reddit\_collect\_comment table:
+    
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `flair_text` `flair_text` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body` `body` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body_html` `body_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+
 - Create indexes on reddit IDs we use to check for duplicates/look up existing records (reddit ID, for example).  _This is really important!  As your table grows, an un-indexed lookup will slow WAY down!_
 
     - columns on the reddit\_collect\_post table:
 
             ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_id` (reddit_id);
+
+    - columns on the reddit\_collect\_comment table:
+
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_id` (reddit_id);
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_full_id` (reddit_full_id);
 
 - You might need to also tweak the mysql configuration.  On ubuntu, this is in /etc/mysql/my.cnf:
 
@@ -118,9 +125,9 @@ This code collects and stores data from reddit in a database, using django ORM m
             
             innodb_buffer_pool_size = 8G
             
-    - innodb_flush_log_at_trx_commit - you can change this to 0 to allow the database to sync memory to disk less often (once a second, where the default of 1 forces sync after every commit).
+    - innodb\_flush\_log\_at\_trx\_commit - you can change this to 0 to allow the database to sync memory to disk less often (once a second, where the default of 1 forces sync after every commit).
     
-            innodb\_flush\_log\_at\_trx\_commit = 0
+            innodb_flush_log_at_trx_commit = 0
             
     - See [http://www.slideshare.net/osscube/mysql-performance-tuning-top-10-tips](http://www.slideshare.net/osscube/mysql-performance-tuning-top-10-tips) for more information.
 
@@ -150,15 +157,14 @@ This code collects and stores data from reddit in a database, using django ORM m
     # initialize bare minimum connection parameters.
     reddit_collector.user_agent = "reddit post collector v0.1 by /u/jonathan_morgan"
     
+    # OR reddit_collector.user_agent = "reddit comment collector v0.1 by /u/jonathan_morgan"
+    
     # optional, if you need to log in:
     reddit_collector.username = "<reddit_username>"
     reddit_collector.password = "<reddit_password>"
     
     # optional - also can set path to store cookies, if you want to persist them.
     reddit_collector.cookie_file_path = "cookies.txt"
-    
-    # just want a ReddiWrap instance?
-    reddiwrap = reddit_collector.create_reddiwrap_instance()
     
     # collect latest 10 entries from /r/all, store them in database.
     reddit_collector.collect_posts( 10 )
@@ -191,6 +197,9 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 ### Reddiwrap Usage
 
+    # just want a ReddiWrap instance?  Initialize collecter like above, then...
+    reddiwrap = reddit_collector.create_reddiwrap_instance()
+    
     # search /r/all for posts from a specific sub-reddit
     reddiwrap.search( query = "subreddit:boston&limit=100", subreddit = "all", sort = "new" )
     
@@ -202,7 +211,7 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     #-- END iteration over search results --#
     
-    # try getting all from /r/all - see if we can step past 1000 results.
+    # try getting all from /r/all
     post_list = reddiwrap.get( "/r/%s/new?limit=100" % "all" )
     
     # get first post in list.
@@ -217,6 +226,34 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     # save to database.
     django_post.save()
+    
+    # ==> Comments
+    
+    # from database, find a post with lots of comments (t3_1cp0i3) and load it.
+    comment_django_post = reddit_collect.models.Post.objects.get( reddit_id = '1cp0i3' )
+
+    # create a reddiwrap Post instance from django Post.
+    comment_rw_post = comment_django_post.create_reddiwrap_post()
+    
+    # get comments.
+    reddiwrap.fetch_comments( comment_rw_post )
+    
+    # top-level comment list
+    comment_list = comment_rw_post.comments
+    
+    # get 1st comment.
+    test_comment = comment_list[ 0 ]
+    
+    # print out details
+    print( test_comment.verbose() )
+    
+    # get children
+    comment_responses = test_comment.children
+    
+    # get a child
+    test_child = comment_responses[ 0 ]
+    
+    # etc.
 
 ## Notes
 
@@ -224,10 +261,16 @@ This code collects and stores data from reddit in a database, using django ORM m
 - added created and updated timestamps on each table.
 - date columns that end in "_dt" store dates converted from unix timestamp to datetime in database.
 - using bulk_create() to insert the Posts into the database instead of saving each (1 query instead of 100 for each set of 100...).
+- there is some django memory management code used that you should be aware of:
+
+        # memory management.
+        gc.collect()                # force garbage collection by python.
+        django.db.reset_queries()   # clear query caches (they get quite big if a program runs long enough).
 
 ## TODO
 
-- all done?!?
+- test code to collect comments.
+- run that code on all posts in /r/boston and /r/news in our database (to start - can always grab more later as needed).
 
 ## Questions
 

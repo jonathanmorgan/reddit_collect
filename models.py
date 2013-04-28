@@ -10,6 +10,7 @@ from __future__ import unicode_literals
 
 from django.db import models
 import django.utils.encoding
+from django.utils.encoding import python_2_unicode_compatible
 
 # reddiwrap reddit API library
 import reddiwrap.ReddiWrap
@@ -21,6 +22,8 @@ from python_utilities.strings.string_helper import StringHelper
 # python libraries
 import datetime
 
+
+@python_2_unicode_compatible
 class Subreddit(models.Model):
 
     #============================================================================
@@ -94,9 +97,41 @@ class Subreddit(models.Model):
     #-- END method set_fields_from_reddiwrap --#
 
 
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Subreddit " + str( self.id ) + " - "
+        
+        #-- END check to see if id --#
+        
+        # name = type + reddit ID (t5_2qh0u)
+        if( self.name ):
+        
+            string_OUT += self.name + " - "
+        
+        #-- END check to see if reddit_id --#
+        
+        # URL - includes the subreddit name.
+        if ( self.url ):
+        
+            string_OUT += self.url
+        
+        #-- END check to see if URL --#
+
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
 #-- END Subreddit model --#
 
 
+@python_2_unicode_compatible
 class User(models.Model):
 
     #============================================================================
@@ -104,6 +139,9 @@ class User(models.Model):
     #============================================================================
 
     reddit_id = models.CharField( max_length = 255)
+    name = models.TextField( null = True, blank = True )
+    is_gold = models.BooleanField( blank = True, default = False )
+    is_mod = models.BooleanField( blank = True, default = False )
     created = models.TextField( null = True, blank = True )
     created_dt = models.DateTimeField( null = True, blank = True )
     created_utc = models.TextField( null = True, blank = True )
@@ -141,6 +179,9 @@ class User(models.Model):
         if ( ( instance_IN ) and ( instance_IN != None ) ):
     
             self.reddit_id = instance_IN.id
+            self.name = instance_IN.name                   # String, username
+            self.is_gold = BooleanHelper.convert_value_to_boolean( instance_IN.is_gold ) # Boolean
+            self.is_mod = BooleanHelper.convert_value_to_boolean( instance_IN.is_mod ) # Boolean
             self.created = instance_IN.created             # Time since 1/1/1970 when acct was created
             self.created_utc = instance_IN.created_utc     # Same as 'created', but in UTC
             self.link_karma = instance_IN.link_karma       # Integer, total score of submissions
@@ -149,12 +190,9 @@ class User(models.Model):
             # what to do about these?
             '''
             self.has_mail      = json_data['has_mail']      # Boolean, True if user has unread mail.
-            self.name          = json_data['name']          # String, username
             if json_data.get('modhash') != None:
-                self.modhash       = json_data['modhash']     # Unique hash for interacting with account
-            self.is_gold       = json_data['is_gold']      # Boolean
+                self.modhash       = json_data['modhash']       # Unique hash for interacting with account
             self.has_mod_mail  = json_data['has_mod_mail']  # Boolean
-            self.is_mod        = json_data['is_mod']        # Boolean
             '''			
 
         #-- END check to make sure instance passed in. --#
@@ -162,9 +200,41 @@ class User(models.Model):
     #-- END method set_fields_from_reddiwrap --#
 
 
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "User " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # reddit ID
+        if( self.reddit_id ):
+        
+            string_OUT += " - " + self.reddit_id
+        
+        #-- END check to see if reddit_id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
 #-- END User model --#
 
 
+@python_2_unicode_compatible
 class Post(models.Model):
 
 
@@ -374,18 +444,51 @@ class Post(models.Model):
     #-- END method create_reddiwrap_post --#
 
 
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Post " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        # title
+        if( self.title ):
+        
+            string_OUT += " - " + self.title
+        
+        #-- END check to see if title --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
 #-- END Post model --#
 
 
+@python_2_unicode_compatible
 class Comment( models.Model ):
 
     #============================================================================
     # Django model fields.
     #============================================================================
 
-    reddit_id = models.TextField()
+    reddit_id = models.CharField( max_length = 255 )
+    reddit_full_id = models.CharField( max_length = 255, null = True, blank = True )
     name = models.TextField( null = True, blank = True )
-    link_id = models.TextField( null = True, blank = True )
+    link_id = models.CharField( max_length = 255 )
     parent = models.ForeignKey( 'self', null = True, blank = True )
     parent_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
     author = models.ForeignKey( User, null = True, blank = True )
@@ -395,7 +498,9 @@ class Comment( models.Model ):
     post_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
     body = models.TextField( null = True, blank = True )
     body_html = models.TextField( null = True, blank = True )
-    subreddit = models.TextField( null = True, blank = True )
+    subreddit = models.ForeignKey( Subreddit, null = True, blank = True )
+    subreddit_name = models.TextField( null = True, blank = True )
+    subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
     upvotes = models.IntegerField( null = True, blank = True )
     downvotes = models.IntegerField( null = True, blank = True )
     score = models.IntegerField( null = True, blank = True )
@@ -442,14 +547,17 @@ class Comment( models.Model ):
         if ( ( instance_IN ) and ( instance_IN != None ) ):
     
             self.modhash = instance_IN.modhash
-            self.reddit_id = instance_IN.id
-            self.name = instance_IN.name
-            self.link_id = instance_IN.link_id
-            self.parent_id = instance_IN.parent_id
-            self.author_name = instance_IN.author
-            self.body = instance_IN.body
-            self.body_html = instance_IN.body_html
-            self.subreddit = instance_IN.subreddit
+            self.reddit_id = instance_IN.id # reddit id (c9irgqx)
+            self.reddit_full_id = instance_IN.name # type + reddit id (t1_c9irgqx)
+            self.reddit_name = instance_IN.name # type + reddit id (t1_c9irgqx)
+            self.link_id = instance_IN.link_id # type + reddit ID of parent post (t3_1cp0i3).
+            self.parent_reddit_id = instance_IN.parent_id # reddit full ID of parent comment, if there is a parent.
+            self.post_reddit_id = instance_IN.link_id # strip type?
+            self.author_name = instance_IN.author # username of poster (UnixCurious)
+            self.body = django.utils.encoding.smart_text( instance_IN.body  ).encode( 'ascii', 'xmlcharrefreplace' )
+            self.body_html = django.utils.encoding.smart_text( instance_IN.body_html ).encode( 'ascii', 'xmlcharrefreplace' )
+            self.subreddit_name = instance_IN.subreddit # name of subreddit
+            self.subreddit_reddit_id = instance_IN.subreddit_id # type + reddit ID of subreddit.
             self.upvotes = instance_IN.upvotes
             self.downvotes = instance_IN.downvotes
             self.score = instance_IN.score
@@ -457,12 +565,12 @@ class Comment( models.Model ):
             self.created_dt = datetime.datetime.fromtimestamp( int( self.created ) )
             self.created_utc = instance_IN.created_utc
             self.created_utc_dt = datetime.datetime.fromtimestamp( int( self.created_utc ) )
-            self.edited = instance_IN.edited
+            self.edited = BooleanHelper.convert_value_to_boolean( instance_IN.edited )
             self.num_reports = instance_IN.num_reports
             self.banned_by = instance_IN.banned_by
             self.approved_by = instance_IN.approved_by
             self.flair_class = instance_IN.flair_class
-            self.flair_text = instance_IN.flair_text
+            self.flair_text = django.utils.encoding.smart_text( instance_IN.flair_text ).encode( 'ascii', 'xmlcharrefreplace' )
             
             # what to do about these?
             # self.children    = []
@@ -472,6 +580,44 @@ class Comment( models.Model ):
         #-- END check to make sure instance passed in. --#
     
     #-- END method set_fields_from_reddiwrap --#
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Comment " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        # author_name
+        if( self.author_name ):
+        
+            string_OUT += " - by " + self.author_name
+        
+        #-- END check to see if author_name --#
+        
+        # subreddit
+        if( self.subreddit ):
+        
+            string_OUT += " - in /r/" + self.subreddit
+        
+        #-- END check to see if subreddit --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
 
 
 #-- END Comment model --#
