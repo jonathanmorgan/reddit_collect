@@ -36,13 +36,13 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         cd ..
     
-- cd into the reddit_socs directory.
+### Configure settings.py
+
+- cd into the site configuration directory, where settings.py is located (it is named the same as your site directory, but inside your site directory, alongside all the other django code you pulled in from git).
 
         cd socs_reddit
 
-### Configure settings.py
-
-- set USE_TZ to false to turn off time zone support:
+- in settings.py, set USE_TZ to false to turn off time zone support:
 
         USE_TZ = False
 
@@ -97,12 +97,32 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 - Once database is configured in settings.py, in your site directory, run "python manage.py syncdb" to create database tables.
     
-- For each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8 and utf8_unicode_ci.  Here is SQL for the columns I've had to change thus far:
+- If MySQL, for each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8 and utf8_unicode_ci.  Here is SQL for the columns I've changed thus far:
+
+    - columns on reddit\_collect\_post table:
     
-        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `author_flair_text` `author_flair_text` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
-        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `title` `title` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
-        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext` `selftext` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
-        ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext_html` `selftext_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `author_flair_text` `author_flair_text` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `title` `title` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext` `selftext` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext_html` `selftext_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
+
+- Create indexes on reddit IDs we use to check for duplicates/look up existing records (reddit ID, for example).  _This is really important!  As your table grows, an un-indexed lookup will slow WAY down!_
+
+    - columns on the reddit\_collect\_post table:
+
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_id` (reddit_id);
+
+- You might need to also tweak the mysql configuration.  On ubuntu, this is in /etc/mysql/my.cnf:
+
+    - innodb\_buffer\_pool\_size - this defines how much memory the database can use as cache.  It defaults to 8 MB (to persist to disk relatively quickly).  To speed up import, you can bump it up to 50% of your total memory, or even closer to 80% if the machine is a dedicated database server.  On my box, for example, I have 20 GB of RAM, so I have it set to 8G (M = megabyte, G = gigabyte).
+            
+            innodb_buffer_pool_size = 8G
+            
+    - innodb_flush_log_at_trx_commit - you can change this to 0 to allow the database to sync memory to disk less often (once a second, where the default of 1 forces sync after every commit).
+    
+            innodb\_flush\_log\_at\_trx\_commit = 0
+            
+    - See [http://www.slideshare.net/osscube/mysql-performance-tuning-top-10-tips](http://www.slideshare.net/osscube/mysql-performance-tuning-top-10-tips) for more information.
 
 ## Usage
 
@@ -159,6 +179,16 @@ This code collects and stores data from reddit in a database, using django ORM m
     # or combine to test - just 350 posts, no more.
     reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
     
+### RedditCollector.collect_posts() parameters:
+
+- _subreddit\_IN_ - defaults to "all". Subreddit you want to collect from.
+- _post\_count\_limit\_IN_ - number of posts we want to collect.
+- _until\_id\_IN_ - value of ID we collect until we encounter in the stream (should include type - so begin with "t3_").
+- _until\_date\_IN_ - datetime instance of UTC/GMT date and time we want to collect to (will stop collecting once a date after this is encountered).
+- _subreddit\_in\_list\_IN_ - list of subreddits to limit our collection to (each should begin with "t5_").  If you use this, in most cases, you should leave subreddit_IN = "all".
+- _after\_id\_IN_ - ID you want to get posts after.  Must include type (start with "t3_").  Use this to start at a point in time earlier than the present - to collect from a certain date, find a post around the date you want, collect from that ID on using the after_id_IN parameter.
+- _before\_id\_IN_ - ID before which you want posts.  Must include type (start with "t3_").
+
 ### Reddiwrap Usage
 
     # search /r/all for posts from a specific sub-reddit
@@ -190,22 +220,18 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 ## Notes
 
-- Always have an integer primary key separate from the application-specific key, for troubleshooting your program.
-- don't use breaks.  Single points of entry and exit, structure conditionals, loops so no breaks.
-- for "main" programs, build them as class or static methods on a class, so they can be invoked in a script, but also easily invoked as part of a program, as well.
-- sqlite database files are generally named *.sqlite
-- want created and updated timestamps on each table.
-- place to store dates converted to datetime in database.
+- Added an an integer primary key separate from the application-specific key, for troubleshooting, django support.
+- added created and updated timestamps on each table.
+- date columns that end in "_dt" store dates converted from unix timestamp to datetime in database.
+- using bulk_create() to insert the Posts into the database instead of saving each (1 query instead of 100 for each set of 100...).
 
 ## TODO
 
-- continue to look over and understand code.
-- built models.  Update sqlite database, code so it has a separate unique ID, then reddit_id.
-- Change table names, switch to django models for queries, inserts, etc.
+- all done?!?
+
+## Questions
+
 - Q - do we need to keep checking in on posts, comments until they reach a certain stability criteria?  Or just for a certain time period?
 - Q - Do we want time series on votes, voting, scores?
-- // need mysql so we can have concurrency (scanning for and categorizing URLs, for example, while reddit collection is still ongoing).
-- // need to work on the code for collection - gather user info?  check back in on posts, comments?
+- Q - need to work on the code for collection - gather user info?  check back in on posts, comments?
 - Q - need a way to load JSON directly into django model instance, or is it OK to just load from ReddiWrapper objects?  For now, just using RediWrapper.
-- test if the reddiwrap post instances have comments nested (I think they don't).
-- * look at using bulk_create() to insert the Posts into the database instead of saving each (1 query instead of 100 for each set of 100... should be much better).
