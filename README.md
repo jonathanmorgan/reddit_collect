@@ -165,7 +165,11 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     # optional - also can set path to store cookies, if you want to persist them.
     reddit_collector.cookie_file_path = "cookies.txt"
-    
+
+    #============================================================================
+    # ==> Collect Posts    
+    #============================================================================
+
     # collect latest 10 entries from /r/all, store them in database.
     reddit_collector.collect_posts( 10 )
     
@@ -184,6 +188,32 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     # or combine to test - just 350 posts, no more.
     reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
+
+    #============================================================================
+    # ==> Collect Comments
+    #============================================================================
+
+    # first, retrieve one or more posts from database using Django QuerySets
+    # - https://docs.djangoproject.com/en/dev/ref/models/querysets/
+
+    # for now, one post.
+    import reddit_collect.models
+    post_qs = reddit_collect.models.Post.objects.filter( reddit_id = '1cp0i3' )
+    
+    # num_comments?
+    django_post = post_qs[ 0 ]
+    print( django_post.num_comments ) # 115, at time of collection
+    
+    # pass the QuerySet to the collect_comments() method.
+    reddit_collector.collect_comments( post_qs )
+    
+    # collect comments for all posts in /r/boston in our data set.
+    comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'boston' ).order_by( '-created_utc_dt' )
+    reddit_collector.collect_comments( comment_qs )
+    
+    # collect comments for all posts in /r/news in our data set.
+    comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'news' ).order_by( '-created_utc_dt' )
+    reddit_collector.collect_comments( comment_qs )
     
 ### RedditCollector.collect_posts() parameters:
 

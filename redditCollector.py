@@ -27,6 +27,11 @@ from python_utilities.rate_limited.basic_rate_limited import BasicRateLimited
 # ReddiWrapper
 from reddiwrap.ReddiWrap import ReddiWrap
 
+
+#================================================================================
+# class RedditCollector
+#================================================================================
+
 class RedditCollector( BasicRateLimited ):
 
 
@@ -175,17 +180,29 @@ class RedditCollector( BasicRateLimited ):
         #-- END check to see if posts passed in --#
         
         # loop over posts.
+        post_counter = 0
+        continue_collecting = True
         post_count = len( posts_to_process_qs )
         for current_post in posts_to_process_qs:
         
-            # see if it is OK to continue (though we aren't cool enough to really
-            #    do this fast just yet).
-            continue_collecting = self.may_i_continue()
+            # see if it is OK to continue.
+
+            # call may_i_continue() if other than first post
+            if ( post_counter > 0 ):
+            
+                # not first post.  call may_i_continue()
+                continue_collecting = self.may_i_continue()
+            
+            #-- END check to see if first post --#
+            
+            # OK to continue?
             if continue_collecting == True:
             
                 # increment post counter
                 post_counter += 1
                 
+                print( "- " + str( post_counter ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - created on " + str( current_post.created_utc_dt ) )
+
                 # memory management.
                 gc.collect()
                 django.db.reset_queries()
@@ -248,13 +265,30 @@ class RedditCollector( BasicRateLimited ):
                     comment_create_count += django_current_create_count
                     
                 #-- END check to see if bulk or not. --#
+                
+                # update the post to show that it has been comment-harvested.
+                if ( current_post.comment_collection_status == reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_NEW ):
+                
+                    # update status to "ongoing".
+                    current_post.comment_collection_status = reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_ONGOING
+                    current_post.save()
+                
+                #-- END check to see if first-time updating comments. --#
+
+            else:
+            
+                # may_i_continue() returned False.  Once that happens once,
+                #    unlikely it will return True ever again.
+                print( "====> In " + me + ": may_i_continue() returned False.  This shouldn't be possible.  Falling out of loop." )
+                break                
                             
             #-- END check to see if we are OK to continue collecting. --#
         
         #-- END loop over posts. --#
         
         # output overall summary
-        print( "==> Posts processed: " + str( post_count ) )
+        print( "==> Posts passed in: " + str( post_count ) )
+        print( "==> Posts processed: " + str( post_counter ) )
         print( "==> Comments created: " + str( comment_create_count ) )
         print( "==> Collection started: " + str( start_dt ) )
 
@@ -892,7 +926,7 @@ class RedditCollector( BasicRateLimited ):
                         exception_type, exception_value, exception_traceback = sys.exc_info()
 
                         # output
-                        print( "====> In " + me + ": reddit post " + current_post_reddit_id + " threw exception on save()." )
+                        print( "====> In " + me + ": reddit comment " + comment_reddit_full_id + " threw exception on save()." )
                         print( "      - args = " + str( e.args ) )
                         print( "      - type = " + str( exception_type ) )
                         print( "      - value = " + str( exception_value ) )
@@ -922,6 +956,9 @@ class RedditCollector( BasicRateLimited ):
             #-- END loop over comments. --#
         
         #-- END check to see if comments. --#
+        
+        # return comment_count
+        comment_count_OUT = comment_count
         
         return comment_count_OUT
     

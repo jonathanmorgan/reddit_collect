@@ -23,6 +23,36 @@ from python_utilities.strings.string_helper import StringHelper
 import datetime
 
 
+#================================================================================
+# functions
+#================================================================================
+
+
+def safe_string( string_IN = None ):
+
+    # return reference
+    string_OUT = None
+
+    # store what was passed in in output reference.
+    string_OUT = string_IN
+
+    # make sure it is not None or empty string    
+    if ( ( string_OUT ) and ( string_OUT != None ) and ( string_OUT != "" ) ):
+
+        string_OUT = django.utils.encoding.smart_text( string_OUT ).encode( 'ascii', 'xmlcharrefreplace' )
+        
+    #-- END check to see if any flair text - don't want "None". --#
+
+    return string_OUT
+
+#-- END function clean_string() --#
+
+
+#================================================================================
+# django models
+#================================================================================
+
+
 @python_2_unicode_compatible
 class Subreddit(models.Model):
 
@@ -327,7 +357,7 @@ class Post(models.Model):
         '''
     
         # declare variables
-        unicode_error_string = ""
+        text_value = ""
         
         # got an instance passed in?
         if ( ( instance_IN ) and ( instance_IN != None ) ):
@@ -343,8 +373,8 @@ class Post(models.Model):
             self.subreddit_reddit_id = instance_IN.subreddit_id
             self.permalink = instance_IN.permalink         # Link to the post (including comments)
             self.is_self = BooleanHelper.convert_value_to_boolean( instance_IN.is_self ) # Self-post?
-            self.selftext = django.utils.encoding.smart_text( instance_IN.selftext ).encode( 'ascii', 'xmlcharrefreplace' )         # Self-post text
-            self.selftext_html = django.utils.encoding.smart_text( instance_IN.selftext_html ).encode( 'ascii', 'xmlcharrefreplace' ) # HTML for self-post text
+            self.selftext = safe_string( instance_IN.selftext )           # Self-post text
+            self.selftext_html = safe_string( instance_IN.selftext_html ) # HTML for self-post text
             self.num_comments = instance_IN.num_comments   # Number of comments
             self.score = instance_IN.score                 # upvotes - downvotes * crazy reddit vote fuzzing constant
             self.upvotes = instance_IN.upvotes
@@ -359,7 +389,7 @@ class Post(models.Model):
             self.approved_by = instance_IN.approved_by
             self.link_flair_text = instance_IN.link_flair_text
             self.link_flair_class = instance_IN.link_flair_class # link_flair_css_class": null,
-            self.author_flair_text = django.utils.encoding.smart_text( instance_IN.author_flair_text ).encode( 'ascii', 'xmlcharrefreplace' )
+            self.author_flair_text = safe_string( instance_IN.author_flair_text )
             self.author_flair_class = instance_IN.author_flair_class
             self.clicked = BooleanHelper.convert_value_to_boolean( instance_IN.clicked ) # If logged-in user has clicked link yet
             self.hidden = BooleanHelper.convert_value_to_boolean( instance_IN.hidden )
@@ -470,6 +500,13 @@ class Post(models.Model):
         
         #-- END check to see if title --#
         
+        # author_name
+        if ( self.author_name ):
+        
+            string_OUT += " - by " + self.author_name
+        
+        #-- END cehcek for author_name --#
+        
         return string_OUT
 
     #-- END __str__() method --#
@@ -570,7 +607,7 @@ class Comment( models.Model ):
             self.banned_by = instance_IN.banned_by
             self.approved_by = instance_IN.approved_by
             self.flair_class = instance_IN.flair_class
-            self.flair_text = django.utils.encoding.smart_text( instance_IN.flair_text ).encode( 'ascii', 'xmlcharrefreplace' )
+            self.flair_text = safe_string( instance_IN.flair_text )
             
             # what to do about these?
             # self.children    = []
