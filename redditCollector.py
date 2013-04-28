@@ -218,7 +218,7 @@ class RedditCollector( BasicRateLimited ):
                             django_bulk_create_count = len( django_bulk_create_list )
                             comment_create_count += django_bulk_create_count
 
-                        except Exception, e:
+                        except Exception as e:
                             
                             # error saving.  Probably encoding error.
         
@@ -529,7 +529,7 @@ class RedditCollector( BasicRateLimited ):
                                     # save to database.
                                     django_post.save()
                                     
-                                except Exception, e:
+                                except Exception as e:
                                 
                                     # error saving.  Probably encoding error.
     
@@ -577,7 +577,7 @@ class RedditCollector( BasicRateLimited ):
                         # save to database using bulk_create().
                         reddit_collect.models.Post.objects.bulk_create( django_post_create_list )
                         
-                    except Exception, e:
+                    except Exception as e:
                     
                         # error saving.  Probably encoding error.
 
@@ -884,7 +884,7 @@ class RedditCollector( BasicRateLimited ):
                         # save to database.
                         django_comment.save()
                         
-                    except Exception, e:
+                    except Exception as e:
                     
                         # error saving.  Probably encoding error.
 
