@@ -47,6 +47,7 @@ This code collects and stores data from reddit in a database, using django ORM m
     - For mysql:
 
         - create mysql database.
+            - To support emoji and crazy characters, set encoding to utf8mb4 and collation to utf8mb4_unicode_ci.
         - create user to interact with mysql database.  Set permissions so user has all permissions to your database.
         - In settings.py, in the DATABASES structure:
             - set the ENGINE to "django.db.backends.mysql"
@@ -92,6 +93,10 @@ This code collects and stores data from reddit in a database, using django ORM m
 ### Set up database
 
 - Once database is configured in settings.py, in your site directory, run "python manage.py syncdb" to create database tables.
+
+- Then, go back in and set all tables that might have emojis or other 4-byte unicode characters to have character set of utf8mb4 and collation of utf8mb4_unicode_ci.  Example:
+
+        ALTER TABLE `socs_reddit`.`reddit_collect_post`
     
 - If MySQL, for each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8 and utf8_unicode_ci.  Here is SQL for the columns I've changed thus far:
 
@@ -180,11 +185,12 @@ This code collects and stores data from reddit in a database, using django ORM m
     reddit_collector.collect_posts( until_id_IN = "t3_1d68lz" )
     
     # collect posts through date - start of 2013/04/26
-    test_date = datetime.datetime( 2013, 4, 26, 0, 0, 0, 0 )
-    reddit_collector.collect_posts( until_date_IN = test_date )
+    boundary_date = datetime.datetime( 2013, 4, 26, 0, 0, 0, 0 )
+    reddit_collector.collect_posts( until_date_IN = boundary_date )
     
-    # combine arguments to pick up where you left off.
-    reddit_collector.collect_posts( until_date_IN = test_date, after_id_IN = "t3_1d63sm" )
+    # in the event of a crash, find ID of last record retrieved, then combine
+    #    arguments to pick up where you left off.
+    reddit_collector.collect_posts( until_date_IN = boundary_date, after_id_IN = "t3_1d63sm" )
     
     # or combine to test - just 350 posts, no more.
     reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
@@ -209,11 +215,11 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     # collect comments for all posts in /r/boston in our data set.
     comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'boston' ).order_by( '-created_utc_dt' )
-    reddit_collector.collect_comments( comment_qs )
+    reddit_collector.collect_comments( comment_rs )
     
     # collect comments for all posts in /r/news in our data set.
     comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'news' ).order_by( '-created_utc_dt' )
-    reddit_collector.collect_comments( comment_qs )
+    reddit_collector.collect_comments( comment_rs )
     
 ### RedditCollector.collect_posts() parameters:
 
@@ -296,15 +302,31 @@ This code collects and stores data from reddit in a database, using django ORM m
         # memory management.
         gc.collect()                # force garbage collection by python.
         django.db.reset_queries()   # clear query caches (they get quite big if a program runs long enough).
+        
+- utf8 vs. utf8mb4 in mysql:
+    - Detecting strings that have 4-byte unicode - 1: [http://stackoverflow.com/questions/3220031/how-to-filter-or-replace-unicode-characters-that-would-take-more-than-3-bytes](http://stackoverflow.com/questions/3220031/how-to-filter-or-replace-unicode-characters-that-would-take-more-than-3-bytes)
+    - Detecting strings that have 4-byte unicode - 2: [http://stackoverflow.com/questions/10798605/warning-raised-by-inserting-4-byte-unicode-to-mysql](http://stackoverflow.com/questions/10798605/warning-raised-by-inserting-4-byte-unicode-to-mysql)
+    - Converting mysql databases and tables from utf8 to utf8mb4 - basic: [http://dba.stackexchange.com/questions/8239/how-to-easily-convert-utf8-tables-to-utf8mb4-in-mysql-5-5](http://dba.stackexchange.com/questions/8239/how-to-easily-convert-utf8-tables-to-utf8mb4-in-mysql-5-5)
+    - Converting mysql databases and tables from utf8 to utf8mb4 - detailed: [http://mathiasbynens.be/notes/mysql-utf8mb4](http://mathiasbynens.be/notes/mysql-utf8mb4)
 
 ## TODO
 
-- test code to collect comments.
-- run that code on all posts in /r/boston and /r/news in our database (to start - can always grab more later as needed).
+- implement a way to load Django models directly from JSON.
+- add ability to update existing posts, comments, not just ignore if already present.
+- add ability to pull in information on subreddits, users.
+- improve rate-limited code so we can have multiple scrapers going at once, coordinated by central traffic cop (re-usable for other projects, as well).
+
+### deal with 4-byte unicode characters.
+
+- implement method to detect 4-byte unicode characters.
+- integrate it into testing for current database configuration.
+- backup database as it stands now.
+- convert everything in database to utf8mb4 and utf8mb4_unicode_ci.
+- make calls to safe_string default to 'utf-8', not 'ascii'.
+- collect, see if things break.
 
 ## Questions
 
-- Q - do we need to keep checking in on posts, comments until they reach a certain stability criteria?  Or just for a certain time period?
+- Q - do we want ability to keep checking in on posts, comments until they reach a certain stability criteria?  Or just for a certain time period?
 - Q - Do we want time series on votes, voting, scores?
-- Q - need to work on the code for collection - gather user info?  check back in on posts, comments?
-- Q - need a way to load JSON directly into django model instance, or is it OK to just load from ReddiWrapper objects?  For now, just using RediWrapper.
+- Q - praw or rediwrapper?

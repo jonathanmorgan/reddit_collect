@@ -201,7 +201,7 @@ class RedditCollector( BasicRateLimited ):
                 # increment post counter
                 post_counter += 1
                 
-                print( "- " + str( post_counter ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - created on " + str( current_post.created_utc_dt ) )
+                print( "- " + str( post_counter ) + " of " + str( post_count ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - created on " + str( current_post.created_utc_dt ) )
 
                 # memory management.
                 gc.collect()
@@ -454,6 +454,10 @@ class RedditCollector( BasicRateLimited ):
                 current_post_created = current_rw_post.created_utc
                 current_post_created_dt = datetime.datetime.fromtimestamp( int( current_post_created ) )
                 current_post_subreddit_id = current_rw_post.subreddit_id
+                current_post_subreddit_name = current_rw_post.subreddit
+                current_post_url = current_rw_post.url
+                
+                # print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
                 
                 # first post? (I know, couldn't think of a better way...)
                 if ( post_count == 1 ):

@@ -17,7 +17,7 @@ import reddiwrap.ReddiWrap
 
 # python_utilities
 from python_utilities.booleans.boolean_helper import BooleanHelper
-from python_utilities.strings.string_helper import StringHelper
+from python_utilities.django_utils.django_string_helper import DjangoStringHelper
 
 # python libraries
 import datetime
@@ -28,24 +28,17 @@ import datetime
 #================================================================================
 
 
-def safe_string( string_IN = None ):
+def safe_string( string_IN = None, encoding_IN = 'ascii' ):
 
     # return reference
     string_OUT = None
 
     # store what was passed in in output reference.
-    string_OUT = string_IN
-
-    # make sure it is not None or empty string    
-    if ( ( string_OUT ) and ( string_OUT != None ) and ( string_OUT != "" ) ):
-
-        string_OUT = django.utils.encoding.smart_text( string_OUT ).encode( 'ascii', 'xmlcharrefreplace' )
-        
-    #-- END check to see if any flair text - don't want "None". --#
+    string_OUT = DjangoStringHelper.encode_string( string_IN, encoding_IN )
 
     return string_OUT
 
-#-- END function clean_string() --#
+#-- END function safe_string() --#
 
 
 #================================================================================
@@ -365,8 +358,8 @@ class Post(models.Model):
             self.modhash = instance_IN.modhash             # base36 string for communicating with account
             self.reddit_id = instance_IN.id                # base36 id for a post (usually 5 characters)
             self.name = instance_IN.name                   # example: t1_czwe3. t# is content type, the rest is the ID
-            self.title = django.utils.encoding.smart_text( instance_IN.title ).encode( 'ascii', 'xmlcharrefreplace' )                 # Title of post
-            self.url = instance_IN.url                     # URL to post
+            self.title = safe_string( instance_IN.title )  # Title of post
+            self.url = safe_string( instance_IN.url ) # URL to post
             self.author_name = instance_IN.author          # Username of author
             self.domain = instance_IN.domain               # Domain posted ot
             self.subreddit_name = instance_IN.subreddit         # Subreddit posted to
@@ -591,8 +584,8 @@ class Comment( models.Model ):
             self.parent_reddit_id = instance_IN.parent_id # reddit full ID of parent comment, if there is a parent.
             self.post_reddit_id = instance_IN.link_id # strip type?
             self.author_name = instance_IN.author # username of poster (UnixCurious)
-            self.body = django.utils.encoding.smart_text( instance_IN.body  ).encode( 'ascii', 'xmlcharrefreplace' )
-            self.body_html = django.utils.encoding.smart_text( instance_IN.body_html ).encode( 'ascii', 'xmlcharrefreplace' )
+            self.body = safe_string( instance_IN.body )
+            self.body_html = safe_string( instance_IN.body_html )
             self.subreddit_name = instance_IN.subreddit # name of subreddit
             self.subreddit_reddit_id = instance_IN.subreddit_id # type + reddit ID of subreddit.
             self.upvotes = instance_IN.upvotes
