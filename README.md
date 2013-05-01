@@ -32,9 +32,9 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         git clone ssh://<username>@data.jrn.cas.msu.edu/home/socs/git/reddit_collect.git
     
-### Configure settings.py
+### Configure
 
-- from the site_directory, cd into the site configuration directory, where settings.py is located (it is named the same as site_directory, but nested inside site_directory, alongside all the other django code you pulled in from git - <site_directory>/<same_name_as_site_directory>).
+- from the site\_directory, cd into the site configuration directory, where settings.py is located (it is named the same as site\_directory, but nested inside site\_directory, alongside all the other django code you pulled in from git - <site\_directory>/<same\_name\_as\_site\_directory>).
 
         cd <same_name_as_site_directory>
 
@@ -47,7 +47,10 @@ This code collects and stores data from reddit in a database, using django ORM m
     - For mysql:
 
         - create mysql database.
-            - To support emoji and crazy characters, set encoding to utf8mb4 and collation to utf8mb4_unicode_ci.
+            - To support emoji and crazy characters, in mysql >= 5.5.2, you can try setting encoding to utf8mb4 and collation to utf8mb4\_unicode\_ci instead of utf8 and utf8\_unicode\_ci.  It didn't work for me, but I converted the database instead of starting with it like that from scratch, so your mileage may vary.  If you need to do this to an existing database:
+
+                    ALTER DATABASE <database_name> CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
         - create user to interact with mysql database.  Set permissions so user has all permissions to your database.
         - In settings.py, in the DATABASES structure:
             - set the ENGINE to "django.db.backends.mysql"
@@ -90,15 +93,12 @@ This code collects and stores data from reddit in a database, using django ORM m
                     }
                 }
 
-### Set up database
 
 - Once database is configured in settings.py, in your site directory, run "python manage.py syncdb" to create database tables.
 
-- Then, go back in and set all tables that might have emojis or other 4-byte unicode characters to have character set of utf8mb4 and collation of utf8mb4_unicode_ci.  Example:
+### Set up database - MySQL < 5.5.2 (and will work for all versions):
 
-        ALTER TABLE `socs_reddit`.`reddit_collect_post`
-    
-- If MySQL, for each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8 and utf8_unicode_ci.  Here is SQL for the columns I've changed thus far:
+- If MySQL, for each column that could contain crazy unicode characters, run SQL commands to explicitly set those columns to be utf8 and utf8\_unicode\_ci.  Here is SQL for the columns I've changed thus far:
 
     - columns on reddit\_collect\_post table:
     
@@ -113,6 +113,38 @@ This code collects and stores data from reddit in a database, using django ORM m
             ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body` `body` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
             ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body_html` `body_html` longtext CHARACTER SET utf8 COLLATE utf8_unicode_ci DEFAULT NULL;
 
+### Set up database - MySQL 5.5.2 or greater:
+
+This didn't work for me personally, but the Internet says it should work, and it could have failed for me because I didn't start out with the database and tables configured this way (I changed them as outlined below).  At any rate, if I learn more, I'll update this, but you can try it, see what your mileage is.  If you get weird errors that look like this:
+
+    Warning: Incorrect string value: '\xF0\x9F\x98\xA0' for column 'url' at row 1
+
+Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte limit for utf8 is choking on).
+
+- If for some reason they aren't already, set all tables that might have emojis or other 4-byte unicode characters to have character set of utf8mb4 and collation of utf8mb4_unicode_ci (make sure to back up your database before you do this).  Example:
+
+        ALTER TABLE `socs_reddit`.`reddit_collect_post` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        ALTER TABLE `socs_reddit`.`reddit_collect_comment` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        ALTER TABLE `socs_reddit`.`reddit_collect_subreddit` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+        ALTER TABLE `socs_reddit`.`reddit_collect_user` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    
+- If MySQL, for each column that could contain crazy unicode characters, then run SQL commands to explicitly set those columns to be utf8mb4 and utf8mb4\_unicode\_ci.  Here is SQL for the columns I've changed thus far:
+
+    - columns on reddit\_collect\_post table:
+    
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `author_flair_text` `author_flair_text` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `title` `title` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext` `selftext` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` CHANGE COLUMN `selftext_html` `selftext_html` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+
+    - columns on reddit\_collect\_comment table:
+    
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `flair_text` `flair_text` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body` `body` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` CHANGE COLUMN `body_html` `body_html` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL;
+
+### Set up database - all versions:
+
 - Create indexes on reddit IDs we use to check for duplicates/look up existing records (reddit ID, for example).  _This is really important!  As your table grows, an un-indexed lookup will slow WAY down!_
 
     - columns on the reddit\_collect\_post table:
@@ -125,6 +157,18 @@ This code collects and stores data from reddit in a database, using django ORM m
             ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_full_id` (reddit_full_id);
 
 - You might need to also tweak the mysql configuration.  On ubuntu, this is in /etc/mysql/my.cnf:
+
+    - set encoding parameters - MySQL < 5.5.2:
+    
+            init_connect            = 'SET NAMES utf8'
+            character-set-server    = utf8
+            collation-server        = utf8_unicode_ci
+
+    - (optional/might not work) set encoding parameters - MySQL >= 5.5.2:
+    
+            init_connect            = 'SET NAMES utf8mb4'
+            character-set-server    = utf8mb4
+            collation-server        = utf8mb4_unicode_ci
 
     - innodb\_buffer\_pool\_size - this defines how much memory the database can use as cache.  It defaults to 8 MB (to persist to disk relatively quickly).  To speed up import, you can bump it up to 50% of your total memory, or even closer to 80% if the machine is a dedicated database server.  On my box, for example, I have 20 GB of RAM, so I have it set to 8G (M = megabyte, G = gigabyte).
             
@@ -170,6 +214,13 @@ This code collects and stores data from reddit in a database, using django ORM m
     
     # optional - also can set path to store cookies, if you want to persist them.
     reddit_collector.cookie_file_path = "cookies.txt"
+    
+    # optional - if your version of mysql doesn't support utf8mb4 (unicode
+    #    characters greater than 3-bytes), set this to true and it will keep all
+    #    unicode characters 3 bytes and less, turn those that are 4 bytes long
+    #    into XML entities, so they are preserved, but don't break database.
+    # set to escape 4-byte Unicode characters (cursed mysql).
+    reddit_collector.convert_4_byte_unicode_to_entity = True
 
     #============================================================================
     # ==> Collect Posts    
@@ -315,15 +366,6 @@ This code collects and stores data from reddit in a database, using django ORM m
 - add ability to update existing posts, comments, not just ignore if already present.
 - add ability to pull in information on subreddits, users.
 - improve rate-limited code so we can have multiple scrapers going at once, coordinated by central traffic cop (re-usable for other projects, as well).
-
-### deal with 4-byte unicode characters.
-
-- implement method to detect 4-byte unicode characters.
-- integrate it into testing for current database configuration.
-- backup database as it stands now.
-- convert everything in database to utf8mb4 and utf8mb4_unicode_ci.
-- make calls to safe_string default to 'utf-8', not 'ascii'.
-- collect, see if things break.
 
 ## Questions
 

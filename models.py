@@ -28,13 +28,13 @@ import datetime
 #================================================================================
 
 
-def safe_string( string_IN = None, encoding_IN = 'ascii' ):
+def safe_string( string_IN = None, encoding_IN = 'utf-8', entetize_4_byte_unicode_IN = False ):
 
     # return reference
     string_OUT = None
 
     # store what was passed in in output reference.
-    string_OUT = DjangoStringHelper.encode_string( string_IN, encoding_IN )
+    string_OUT = DjangoStringHelper.encode_string( string_IN, encoding_IN, entitize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
 
     return string_OUT
 
@@ -86,7 +86,7 @@ class Subreddit(models.Model):
     #============================================================================
 
 
-    def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
+    def set_fields_from_reddiwrap( self, instance_IN, entetize_4_byte_unicode_IN = False, *args, **kwargs ):
     
         '''
         Accepts a reddiwrap Subreddit instance.  Uses it to populate this instance.
@@ -190,7 +190,7 @@ class User(models.Model):
     #============================================================================
 
 
-    def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
+    def set_fields_from_reddiwrap( self, instance_IN, entetize_4_byte_unicode_IN = False, *args, **kwargs ):
     
         '''
         Accepts a reddiwrap UserInfo instance.  Uses it to populate this instance.
@@ -343,7 +343,7 @@ class Post(models.Model):
     #============================================================================
 
 
-    def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
+    def set_fields_from_reddiwrap( self, instance_IN, entetize_4_byte_unicode_IN = False, *args, **kwargs ):
     
         '''
         Accepts a reddiwrap Post instance.  Uses it to populate this instance.
@@ -358,16 +358,16 @@ class Post(models.Model):
             self.modhash = instance_IN.modhash             # base36 string for communicating with account
             self.reddit_id = instance_IN.id                # base36 id for a post (usually 5 characters)
             self.name = instance_IN.name                   # example: t1_czwe3. t# is content type, the rest is the ID
-            self.title = safe_string( instance_IN.title )  # Title of post
-            self.url = safe_string( instance_IN.url ) # URL to post
+            self.title = safe_string( instance_IN.title, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )  # Title of post
+            self.url = safe_string( instance_IN.url, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN ) # URL to post
             self.author_name = instance_IN.author          # Username of author
-            self.domain = instance_IN.domain               # Domain posted ot
+            self.domain = safe_string( instance_IN.domain, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )              # Domain posted ot
             self.subreddit_name = instance_IN.subreddit         # Subreddit posted to
             self.subreddit_reddit_id = instance_IN.subreddit_id
             self.permalink = instance_IN.permalink         # Link to the post (including comments)
             self.is_self = BooleanHelper.convert_value_to_boolean( instance_IN.is_self ) # Self-post?
-            self.selftext = safe_string( instance_IN.selftext )           # Self-post text
-            self.selftext_html = safe_string( instance_IN.selftext_html ) # HTML for self-post text
+            self.selftext = safe_string( instance_IN.selftext, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )           # Self-post text
+            self.selftext_html = safe_string( instance_IN.selftext_html, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN ) # HTML for self-post text
             self.num_comments = instance_IN.num_comments   # Number of comments
             self.score = instance_IN.score                 # upvotes - downvotes * crazy reddit vote fuzzing constant
             self.upvotes = instance_IN.upvotes
@@ -382,7 +382,7 @@ class Post(models.Model):
             self.approved_by = instance_IN.approved_by
             self.link_flair_text = instance_IN.link_flair_text
             self.link_flair_class = instance_IN.link_flair_class # link_flair_css_class": null,
-            self.author_flair_text = safe_string( instance_IN.author_flair_text )
+            self.author_flair_text = safe_string( instance_IN.author_flair_text, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
             self.author_flair_class = instance_IN.author_flair_class
             self.clicked = BooleanHelper.convert_value_to_boolean( instance_IN.clicked ) # If logged-in user has clicked link yet
             self.hidden = BooleanHelper.convert_value_to_boolean( instance_IN.hidden )
@@ -565,7 +565,7 @@ class Comment( models.Model ):
     #============================================================================
 
 
-    def set_fields_from_reddiwrap( self, instance_IN, *args, **kwargs ):
+    def set_fields_from_reddiwrap( self, instance_IN, entetize_4_byte_unicode_IN = False, *args, **kwargs ):
     
         '''
         Accepts a reddiwrap Comment instance.  Uses it to populate this instance.
@@ -584,8 +584,8 @@ class Comment( models.Model ):
             self.parent_reddit_id = instance_IN.parent_id # reddit full ID of parent comment, if there is a parent.
             self.post_reddit_id = instance_IN.link_id # strip type?
             self.author_name = instance_IN.author # username of poster (UnixCurious)
-            self.body = safe_string( instance_IN.body )
-            self.body_html = safe_string( instance_IN.body_html )
+            self.body = safe_string( instance_IN.body, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
+            self.body_html = safe_string( instance_IN.body_html, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
             self.subreddit_name = instance_IN.subreddit # name of subreddit
             self.subreddit_reddit_id = instance_IN.subreddit_id # type + reddit ID of subreddit.
             self.upvotes = instance_IN.upvotes
@@ -600,7 +600,7 @@ class Comment( models.Model ):
             self.banned_by = instance_IN.banned_by
             self.approved_by = instance_IN.approved_by
             self.flair_class = instance_IN.flair_class
-            self.flair_text = safe_string( instance_IN.flair_text )
+            self.flair_text = safe_string( instance_IN.flair_text, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
             
             # what to do about these?
             # self.children    = []

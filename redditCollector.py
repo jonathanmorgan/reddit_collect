@@ -23,6 +23,7 @@ import reddit_collect.models
 
 # python_utilities
 from python_utilities.rate_limited.basic_rate_limited import BasicRateLimited
+from python_utilities.strings.string_helper import StringHelper
 
 # ReddiWrapper
 from reddiwrap.ReddiWrap import ReddiWrap
@@ -42,6 +43,9 @@ class RedditCollector( BasicRateLimited ):
 
     STATUS_SUCCESS = "Success!"
     STATUS_PREFIX_ERROR = "ERROR: "
+    
+    # DEBUG
+    DEBUG_FLAG = True
 
 
     #============================================================================
@@ -62,6 +66,10 @@ class RedditCollector( BasicRateLimited ):
     
     # performance
     do_bulk_create = True
+    
+    # encoding, to deal with utf8 in mysql actually just allowing for up to
+    #    3-byte unicode characters, not all (4-byte and above).
+    convert_4_byte_unicode_to_entity = False
     
     
     #---------------------------------------------------------------------------
@@ -457,7 +465,11 @@ class RedditCollector( BasicRateLimited ):
                 current_post_subreddit_name = current_rw_post.subreddit
                 current_post_url = current_rw_post.url
                 
-                # print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
+                if ( self.DEBUG_FLAG == True ):
+    
+                    print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
+                    
+                #-- END DEBUG --#
                 
                 # first post? (I know, couldn't think of a better way...)
                 if ( post_count == 1 ):
@@ -551,7 +563,7 @@ class RedditCollector( BasicRateLimited ):
                             django_post = reddit_collect.models.Post()
                             
                             # set fields from reddiwrap post instance.
-                            django_post.set_fields_from_reddiwrap( current_rw_post )
+                            django_post.set_fields_from_reddiwrap( current_rw_post, self.convert_4_byte_unicode_to_entity )
                             
                             # bulk create?
                             if ( django_do_bulk_create == True ):
@@ -900,7 +912,7 @@ class RedditCollector( BasicRateLimited ):
                     django_comment = reddit_collect.models.Comment()
                     
                     # set fields from reddiwrap instance.
-                    django_comment.set_fields_from_reddiwrap( current_rw_comment )
+                    django_comment.set_fields_from_reddiwrap( current_rw_comment, self.convert_4_byte_unicode_to_entity )
                     
                     # if post, set post (better be a post).
                     if ( ( post_IN ) and ( post_IN != None ) ):
@@ -1046,7 +1058,7 @@ class RedditCollector( BasicRateLimited ):
                     django_comment = reddit_collect.models.Comment()
                     
                     # set fields from reddiwrap instance.
-                    django_comment.set_fields_from_reddiwrap( current_rw_comment )
+                    django_comment.set_fields_from_reddiwrap( current_rw_comment, self.convert_4_byte_unicode_to_entity )
                     
                     # if post, set post (better be a post).
                     if ( ( post_IN ) and ( post_IN != None ) ):
