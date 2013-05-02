@@ -14,7 +14,7 @@ import reddit_collect.models
 reddit_collector = RedditCollector()
 
 # initialize bare minimum connection parameters.
-reddit_collector.user_agent = "reddit comment collector v0.1 by /u/jonathan_morgan"
+reddit_collector.user_agent = "reddit comment collector v0.1"
 
 # set to escape 4-byte Unicode characters (cursed mysql).
 reddit_collector.convert_4_byte_unicode_to_entity = True
