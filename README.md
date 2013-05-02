@@ -182,6 +182,8 @@ Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte li
 
 ## Usage
 
+There are also useful example scripts (including shell_init.py, which you can run in a shell started with "python manage.py shell" to create instances of the collector and the reddiwrap object) in /shell.
+
     # make sure the site directory is in the sys path.
     import sys
     site_path = '/home/socs/socs_reddit/'
@@ -268,9 +270,22 @@ Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte li
     comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'boston' ).order_by( '-created_utc_dt' )
     reddit_collector.collect_comments( comment_rs )
     
+    # collect comments for only posts in /r/boston that are 'new'.
+    comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'boston' )
+    comment_rs = comment_rs.filter( comment_collection_status = 'new' )
+    comment_rs = comment_rs.order_by( '-created_utc_dt' )
+    reddit_collector.collect_comments( comment_rs )
+    
     # collect comments for all posts in /r/news in our data set.
     comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'news' ).order_by( '-created_utc_dt' )
     reddit_collector.collect_comments( comment_rs )
+
+    # collect comments for only posts in /r/news that are 'new'.
+    comment_rs = reddit_collect.models.Post.objects.filter( subreddit_name__iexact = 'news' )
+    comment_rs = comment_rs.filter( comment_collection_status = 'new' )
+    comment_rs = comment_rs.order_by( '-created_utc_dt' )
+    reddit_collector.collect_comments( comment_rs )
+    
     
 ### RedditCollector.collect_posts() parameters:
 

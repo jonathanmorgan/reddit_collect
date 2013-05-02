@@ -44,8 +44,8 @@ class RedditCollector( BasicRateLimited ):
     STATUS_SUCCESS = "Success!"
     STATUS_PREFIX_ERROR = "ERROR: "
     
-    # DEBUG
-    DEBUG_FLAG = True
+    # DEBUG - changed to instance variable.
+    #DEBUG_FLAG = False
 
 
     #============================================================================
@@ -70,6 +70,9 @@ class RedditCollector( BasicRateLimited ):
     # encoding, to deal with utf8 in mysql actually just allowing for up to
     #    3-byte unicode characters, not all (4-byte and above).
     convert_4_byte_unicode_to_entity = False
+    
+    # debug_flag
+    debug_flag = False
     
     
     #---------------------------------------------------------------------------
@@ -465,7 +468,7 @@ class RedditCollector( BasicRateLimited ):
                 current_post_subreddit_name = current_rw_post.subreddit
                 current_post_url = current_rw_post.url
                 
-                if ( self.DEBUG_FLAG == True ):
+                if ( self.debug_flag == True ):
     
                     print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
                     

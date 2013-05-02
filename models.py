@@ -364,7 +364,7 @@ class Post(models.Model):
             self.domain = safe_string( instance_IN.domain, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )              # Domain posted ot
             self.subreddit_name = instance_IN.subreddit         # Subreddit posted to
             self.subreddit_reddit_id = instance_IN.subreddit_id
-            self.permalink = instance_IN.permalink         # Link to the post (including comments)
+            self.permalink = safe_string( instance_IN.permalink, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )         # Link to the post (including comments)
             self.is_self = BooleanHelper.convert_value_to_boolean( instance_IN.is_self ) # Self-post?
             self.selftext = safe_string( instance_IN.selftext, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )           # Self-post text
             self.selftext_html = safe_string( instance_IN.selftext_html, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN ) # HTML for self-post text
