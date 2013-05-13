@@ -16,7 +16,7 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         django-admin.py startproject <site_directory>
     
-- cd into the site_directory
+- cd into the site\_directory
 
         cd <site_directory>
     
@@ -24,13 +24,13 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         git clone https://github.com/derv82/reddiwrap.git
 
-- pull in Jon's python_utilities
+- pull in Jon's python\_utilities
 
         git clone https://github.com/jonathanmorgan/python_utilities.git
 
 - pull in our python code
 
-        git clone ssh://<username>@data.jrn.cas.msu.edu/home/socs/git/reddit_collect.git
+        git clone https://github.com/jonathanmorgan/reddit_collect.git
     
 ### Configure
 
@@ -47,6 +47,7 @@ This code collects and stores data from reddit in a database, using django ORM m
     - For mysql:
 
         - create mysql database.
+            - at the least, make your database use character set utf8 and collation utf8_unicode_ci
             - To support emoji and crazy characters, in mysql >= 5.5.2, you can try setting encoding to utf8mb4 and collation to utf8mb4\_unicode\_ci instead of utf8 and utf8\_unicode\_ci.  It didn't work for me, but I converted the database instead of starting with it like that from scratch, so your mileage may vary.  If you need to do this to an existing database:
 
                     ALTER DATABASE <database_name> CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
@@ -182,11 +183,27 @@ Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte li
 
 ## Usage
 
-There are also useful example scripts (including shell_init.py, which you can run in a shell started with "python manage.py shell" to create instances of the collector and the reddiwrap object) in /shell.
+There are also useful example scripts (including shell\_init.py, which you can run in a shell started with "python manage.py shell" to create instances of the collector and the reddiwrap object) in reddit\_collect/examples.
+
+### Getting started and initialization
+
+The easiest way to run code from a shell is to go to your django sites folder and use manage.py to open a shell:
+
+    python manage.py shell
+    
+If you choose, you can also just open the base python interpreter:
+
+    python
+    
+Or you can install something fancier like ipython, and then run ipython:
+
+    ipython
+    
+If you don't use manage.py to open a shell (or if you are making a shell script that will be run on its own), you'll have to do a little additional setup to pull in and configure django:
 
     # make sure the site directory is in the sys path.
     import sys
-    site_path = '/home/socs/socs_reddit/'
+    site_path = '<site_folder_full_path>'
     if site_path not in sys.path:
         
         sys.path.append( site_path )
@@ -195,10 +212,12 @@ There are also useful example scripts (including shell_init.py, which you can ru
     
     # if not running in django shell (python manage.py shell), make sure django
     #    classes have access to settings.py
-    # set DJANGO_SETTINGS_MODULE environment variable = "socs_reddit.settings".
+    # set DJANGO_SETTINGS_MODULE environment variable = "<site_folder_name>.settings".
     import os
-    os.environ[ 'DJANGO_SETTINGS_MODULE' ] = "socs_reddit.settings"
-    
+    os.environ[ 'DJANGO_SETTINGS_MODULE' ] = "<site_folder_name>.settings"
+
+Then, regardless, you'll need to do the following to set up the collector:
+
     # import the RedditCollector class
     from reddit_collect.redditCollector import RedditCollector
     
@@ -224,6 +243,8 @@ There are also useful example scripts (including shell_init.py, which you can ru
     # set to escape 4-byte Unicode characters (cursed mysql).
     reddit_collector.convert_4_byte_unicode_to_entity = True
 
+### Collect Posts
+
     #============================================================================
     # ==> Collect Posts    
     #============================================================================
@@ -247,6 +268,8 @@ There are also useful example scripts (including shell_init.py, which you can ru
     
     # or combine to test - just 350 posts, no more.
     reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
+
+### Collect Comments
 
     #============================================================================
     # ==> Collect Comments
@@ -387,3 +410,23 @@ There are also useful example scripts (including shell_init.py, which you can ru
 - Q - do we want ability to keep checking in on posts, comments until they reach a certain stability criteria?  Or just for a certain time period?
 - Q - Do we want time series on votes, voting, scores?
 - Q - praw or rediwrapper?
+
+## License:
+
+Copyright 2012, 2013 Jonathan Morgan
+
+This file is part of [http://github.com/jonathanmorgan/reddit_collect](http://github.com/jonathanmorgan/reddit_collect).
+
+reddit\_collect is free software: you can redistribute it and/or modify
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+Foobar is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with [http://github.com/jonathanmorgan/reddit_collect](http://github.com/jonathanmorgan/reddit_collect).  If not, see
+[http://www.gnu.org/licenses/](http://www.gnu.org/licenses/).

@@ -1,3 +1,15 @@
+'''
+Copyright 2012, 2013 Jonathan Morgan
+
+This file is part of http://github.com/jonathanmorgan/reddit_collect.
+
+reddit_collect is free software: you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+Foobar is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public License along with http://github.com/jonathanmorgan/reddit_collect. If not, see http://www.gnu.org/licenses/.
+'''
+
 # This is based on an auto-generated Django model module.
 # You'll have to do the following manually to clean this up:
 #     * Rearrange models' order
@@ -47,7 +59,7 @@ def safe_string( string_IN = None, encoding_IN = 'utf-8', entetize_4_byte_unicod
 
 
 @python_2_unicode_compatible
-class Subreddit(models.Model):
+class Abstract_Subreddit( models.Model ):
 
     #============================================================================
     # Django model fields.
@@ -74,7 +86,10 @@ class Subreddit(models.Model):
     # meta class
     #============================================================================
 
-    # class Meta:
+    # meta class so we know this is an abstract class.
+    class Meta:
+
+        abstract = True
 
     #    db_table = 'Subreddit'
 
@@ -151,11 +166,49 @@ class Subreddit(models.Model):
     #-- END __str__() method --#
 
 
-#-- END Subreddit model --#
+#-- END Abstract_Subreddit model --#
 
 
 @python_2_unicode_compatible
-class User(models.Model):
+class Subreddit( Abstract_Subreddit ):
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Subreddit " + str( self.id ) + " - "
+        
+        #-- END check to see if id --#
+        
+        # name = type + reddit ID (t5_2qh0u)
+        if( self.name ):
+        
+            string_OUT += self.name + " - "
+        
+        #-- END check to see if reddit_id --#
+        
+        # URL - includes the subreddit name.
+        if ( self.url ):
+        
+            string_OUT += self.url
+        
+        #-- END check to see if URL --#
+
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
+#-- END class Subreddit --#
+
+
+@python_2_unicode_compatible
+class Abstract_User( models.Model ):
 
     #============================================================================
     # Django model fields.
@@ -178,7 +231,9 @@ class User(models.Model):
     # meta class
     #============================================================================
 
-    # class Meta:
+    class Meta:
+
+        abstract = True
 
     #    db_table = 'User'
 
@@ -254,11 +309,49 @@ class User(models.Model):
     #-- END __str__() method --#
 
 
+#-- END Abstract_User model --#
+
+
+@python_2_unicode_compatible
+class User( Abstract_User ):
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "User " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # reddit ID
+        if( self.reddit_id ):
+        
+            string_OUT += " - " + self.reddit_id
+        
+        #-- END check to see if reddit_id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
 #-- END User model --#
 
 
 @python_2_unicode_compatible
-class Post(models.Model):
+class Abstract_Post( models.Model ):
 
 
     #----------------------------------------------------------------------
@@ -331,8 +424,10 @@ class Post(models.Model):
     # meta class
     #============================================================================
 
-    #class Meta:
+    class Meta:
     
+        abstract = True
+
     #    db_table = 'Post'
 
     #-- END Meta class --#
@@ -505,11 +600,56 @@ class Post(models.Model):
     #-- END __str__() method --#
 
 
+#-- END Abstract_Post model --#
+
+
+@python_2_unicode_compatible
+class Post( Abstract_Post ):
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Post " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        # title
+        if( self.title ):
+        
+            string_OUT += " - " + self.title
+        
+        #-- END check to see if title --#
+        
+        # author_name
+        if ( self.author_name ):
+        
+            string_OUT += " - by " + self.author_name
+        
+        #-- END cehcek for author_name --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
 #-- END Post model --#
 
 
 @python_2_unicode_compatible
-class Comment( models.Model ):
+class Abstract_Comment( models.Model ):
 
     #============================================================================
     # Django model fields.
@@ -553,7 +693,9 @@ class Comment( models.Model ):
     # meta class
     #============================================================================
 
-    # class Meta:
+    class Meta:
+
+        abstract = True
 
     #    db_table = 'Comment'
 
@@ -650,4 +792,48 @@ class Comment( models.Model ):
     #-- END __str__() method --#
 
 
+#-- END Abstract_Comment model --#
+
+@python_2_unicode_compatible
+class Comment( Abstract_Comment ):
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Comment " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        # author_name
+        if( self.author_name ):
+        
+            string_OUT += " - by " + self.author_name
+        
+        #-- END check to see if author_name --#
+        
+        # subreddit
+        if( self.subreddit ):
+        
+            string_OUT += " - in /r/" + self.subreddit
+        
+        #-- END check to see if subreddit --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+    
 #-- END Comment model --#
