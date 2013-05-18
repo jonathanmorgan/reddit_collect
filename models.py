@@ -66,12 +66,13 @@ class Abstract_Subreddit( models.Model ):
     #============================================================================
 
     reddit_id = models.CharField( max_length = 255)
+    reddit_full_id = models.CharField( max_length = 255)
     name = models.TextField( null = True, blank = True )
     display_name = models.TextField( null = True, blank = True )
     title = models.TextField( null = True, blank = True )
     url = models.TextField( null = True, blank = True )
     description = models.TextField( null = True, blank = True )
-    created = models.IntegerField( blank=True)
+    created = models.IntegerField( null = True, blank = True )
     created_dt = models.DateTimeField( null = True, blank = True )
     created_utc = models.TextField( null = True, blank = True )
     created_utc_dt = models.DateTimeField( null = True, blank = True )
@@ -113,7 +114,8 @@ class Abstract_Subreddit( models.Model ):
         if ( ( instance_IN ) and ( instance_IN != None ) ):
     
             self.reddit_id = instance_IN.id              # 2qh0u
-            self.name = instance_IN.name                 # t5_2qh0u
+            self.reddit_full_id = instance_IN.name       # t5_2qh0u
+            self.name = instance_IN.display_name         # pics
             self.display_name = instance_IN.display_name # pics
             self.title = instance_IN.title               # /r/Pics
             self.url = instance_IN.url                   # /r/pics/
@@ -143,21 +145,21 @@ class Abstract_Subreddit( models.Model ):
         # id?
         if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
         
-            string_OUT += "Subreddit " + str( self.id ) + " - "
+            string_OUT += "Subreddit " + str( self.id )
         
         #-- END check to see if id --#
         
-        # name = type + reddit ID (t5_2qh0u)
-        if( self.name ):
+        # reddit_full_id = type + reddit ID (t5_2qh0u)
+        if( self.reddit_full_id ):
         
-            string_OUT += self.name + " - "
+            string_OUT += " - " + self.reddit_full_id
         
-        #-- END check to see if reddit_id --#
+        #-- END check to see if reddit_full_id --#
         
         # URL - includes the subreddit name.
         if ( self.url ):
         
-            string_OUT += self.url
+            string_OUT += " - " + self.url
         
         #-- END check to see if URL --#
 
@@ -181,21 +183,21 @@ class Subreddit( Abstract_Subreddit ):
         # id?
         if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
         
-            string_OUT += "Subreddit " + str( self.id ) + " - "
+            string_OUT += "Subreddit " + str( self.id )
         
         #-- END check to see if id --#
         
-        # name = type + reddit ID (t5_2qh0u)
-        if( self.name ):
+        # reddit_full_id = type + reddit ID (t5_2qh0u)
+        if( self.reddit_full_id ):
         
-            string_OUT += self.name + " - "
+            string_OUT += " - " + self.reddit_full_id
         
-        #-- END check to see if reddit_id --#
+        #-- END check to see if reddit_full_id --#
         
         # URL - includes the subreddit name.
         if ( self.url ):
         
-            string_OUT += self.url
+            string_OUT += " - " + self.url
         
         #-- END check to see if URL --#
 
@@ -215,6 +217,7 @@ class Abstract_User( models.Model ):
     #============================================================================
 
     reddit_id = models.CharField( max_length = 255)
+    reddit_full_id = models.CharField( max_length = 255)
     name = models.TextField( null = True, blank = True )
     is_gold = models.BooleanField( blank = True, default = False )
     is_mod = models.BooleanField( blank = True, default = False )
@@ -376,6 +379,7 @@ class Abstract_Post( models.Model ):
     #============================================================================
 
     reddit_id = models.CharField( max_length = 255)
+    reddit_full_id = models.CharField( max_length = 255)
     name = models.TextField( null = True, blank = True )
     title = models.TextField( null = True, blank = True )
     url = models.TextField( null = True, blank = True )

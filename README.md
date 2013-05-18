@@ -12,6 +12,10 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         (sudo) pip install django
 
+- install South (data migration tool), if it isn't already installed.
+
+        (sudo) pip install South
+
 - in your work directory, create a django site.
 
         django-admin.py startproject <site_directory>
@@ -95,7 +99,42 @@ This code collects and stores data from reddit in a database, using django ORM m
                 }
 
 
+- in settings.py, add 'south' to the INSTALLED\_APPS list.  Example:
+    
+        INSTALLED_APPS = (
+            'django.contrib.auth',
+            'django.contrib.contenttypes',
+            'django.contrib.sessions',
+            'django.contrib.sites',
+            'django.contrib.messages',
+            'django.contrib.staticfiles',
+            # Uncomment the next line to enable the admin:
+            # 'django.contrib.admin',
+            # Uncomment the next line to enable admin documentation:
+            # 'django.contrib.admindocs',
+            'south',
+        )
+
 - Once database is configured in settings.py, in your site directory, run "python manage.py syncdb" to create database tables.
+
+- in settings.py, add 'reddit\_collect' to the INSTALLED\_APPS list.  Example:
+    
+        INSTALLED_APPS = (
+            'django.contrib.auth',
+            'django.contrib.contenttypes',
+            'django.contrib.sessions',
+            'django.contrib.sites',
+            'django.contrib.messages',
+            'django.contrib.staticfiles',
+            # Uncomment the next line to enable the admin:
+            # 'django.contrib.admin',
+            # Uncomment the next line to enable admin documentation:
+            # 'django.contrib.admindocs',
+            'south',
+            'reddit_collect',
+        )
+
+- run `python manage.py migrate reddit_collect`.
 
 ### Set up database - MySQL < 5.5.2 (and will work for all versions):
 
@@ -151,11 +190,14 @@ Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte li
     - columns on the reddit\_collect\_post table:
 
             ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_id` (reddit_id);
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_full_id` (reddit_full_id);
+            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `subreddit_reddit_id` (subreddit_reddit_id);
 
     - columns on the reddit\_collect\_comment table:
 
             ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_id` (reddit_id);
             ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_full_id` (reddit_full_id);
+            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `subreddit_reddit_id` (subreddit_reddit_id);
 
 - You might need to also tweak the mysql configuration.  On ubuntu, this is in /etc/mysql/my.cnf:
 
