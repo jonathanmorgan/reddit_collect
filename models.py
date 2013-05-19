@@ -354,6 +354,98 @@ class User( Abstract_User ):
 
 
 @python_2_unicode_compatible
+class Abstract_Domain( models.Model ):
+
+    #============================================================================
+    # Django model fields.
+    #============================================================================
+
+    name = models.CharField( max_length = 255)
+    long_name = models.TextField( null = True, blank = True )
+    is_self_post = models.BooleanField( blank = True, default = False )
+    is_news = models.BooleanField( blank = True, default = False )
+    is_multimedia = models.BooleanField( blank = True, default = False )
+    use_count = models.IntegerField( null = True, blank = True )
+    create_date = models.DateTimeField( auto_now_add = True )
+    last_update = models.DateTimeField( auto_now = True )
+
+    #============================================================================
+    # meta class
+    #============================================================================
+
+    class Meta:
+
+        abstract = True
+
+    #    db_table = 'User'
+
+    #-- END Meta class --#
+    
+
+    #============================================================================
+    # instance methods
+    #============================================================================
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Domain " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
+#-- END Abstract_Domain model --#
+
+
+@python_2_unicode_compatible
+class Domain( Abstract_Domain ):
+
+
+    def __str__(self):
+        
+        # return reference
+        string_OUT = ""
+        
+        # id?
+        if ( ( self.id ) and ( self.id != None ) and ( self.id > 0 ) ):
+        
+            string_OUT += "Domain " + str( self.id )
+        
+        #-- END check to see if id --#
+        
+        # name
+        if( self.name ):
+        
+            string_OUT += " - " + self.name
+        
+        #-- END check to see if name --#
+        
+        return string_OUT
+
+    #-- END __str__() method --#
+
+
+#-- END Domain model --#
+
+
+@python_2_unicode_compatible
 class Abstract_Post( models.Model ):
 
 
@@ -387,6 +479,8 @@ class Abstract_Post( models.Model ):
     author_name = models.TextField( null = True, blank = True )
     author_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
     domain = models.TextField( null = True, blank = True )
+    domain_name = models.CharField( max_length = 255, null = True, blank = True )
+    domain_long_name = models.TextField( null = True, blank = True )
     subreddit = models.ForeignKey( Subreddit, null = True, blank = True )
     subreddit_name = models.TextField( null = True, blank = True )
     subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
@@ -460,7 +554,7 @@ class Abstract_Post( models.Model ):
             self.title = safe_string( instance_IN.title, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )  # Title of post
             self.url = safe_string( instance_IN.url, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN ) # URL to post
             self.author_name = instance_IN.author          # Username of author
-            self.domain = safe_string( instance_IN.domain, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )              # Domain posted ot
+            self.domain_name = safe_string( instance_IN.domain, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )              # Domain posted ot
             self.subreddit_name = instance_IN.subreddit         # Subreddit posted to
             self.subreddit_reddit_id = instance_IN.subreddit_id
             self.permalink = safe_string( instance_IN.permalink, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )         # Link to the post (including comments)
@@ -525,7 +619,7 @@ class Abstract_Post( models.Model ):
         instance_OUT.title = self.title                 # Title of post
         instance_OUT.url = self.url                     # URL to post
         instance_OUT.author = self.author_name          # Username of author
-        instance_OUT.domain = self.domain               # Domain posted ot
+        instance_OUT.domain = self.domain_name          # Domain posted ot
         instance_OUT.subreddit = self.subreddit_name    # Subreddit posted to
         instance_OUT.subreddit_id = self.subreddit_reddit_id
         instance_OUT.permalink = self.permalink         # Link to the post (including comments)
