@@ -478,7 +478,7 @@ class Abstract_Post( models.Model ):
     author = models.ForeignKey( User, null = True, blank = True )
     author_name = models.TextField( null = True, blank = True )
     author_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
-    domain = models.TextField( null = True, blank = True )
+    domain = models.ForeignKey( Domain, null = True, blank = True )
     domain_name = models.CharField( max_length = 255, null = True, blank = True )
     domain_long_name = models.TextField( null = True, blank = True )
     subreddit = models.ForeignKey( Subreddit, null = True, blank = True )
