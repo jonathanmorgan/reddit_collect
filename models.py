@@ -514,6 +514,18 @@ class Abstract_Post( models.Model ):
     comment_collection_status = models.CharField( max_length = 255, choices = COMMENT_COLLECTION_STATUS_CHOICES, default = COMMENT_COLLECTION_STATUS_NEW )
     comments_last_collected = models.DateTimeField( null = True, blank = True )
     
+    # filtering
+    filter_1 = models.BooleanField( default = False )
+    filter_2 = models.BooleanField( default = False )
+    filter_3 = models.BooleanField( default = False )
+    filter_4 = models.BooleanField( default = False )
+    filter_5 = models.BooleanField( default = False )
+    filter_6 = models.BooleanField( default = False )
+    filter_7 = models.BooleanField( default = False )
+    filter_8 = models.BooleanField( default = False )
+    filter_9 = models.BooleanField( default = False )
+    filter_10 = models.BooleanField( default = False )
+    
     # timestamps
     create_date = models.DateTimeField( auto_now_add = True )
     last_update = models.DateTimeField( auto_now = True )
