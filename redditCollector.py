@@ -596,7 +596,7 @@ class RedditCollector( BasicRateLimited ):
                         # ==> Do we process this post?  We do if:
                         # - post is not in database. - OR -
                         # - post is in database, but update flag is true.
-                        if ( ( is_post_in_database == False ) or ( ( is_post_in_database == True ) and ( do_update_existing == True ) ) )
+                        if ( ( is_post_in_database == False ) or ( ( is_post_in_database == True ) and ( do_update_existing == True ) ) ):
                         
                             # Update appropriate counter
                             if ( is_post_in_database == True ):
@@ -614,10 +614,19 @@ class RedditCollector( BasicRateLimited ):
                             # set fields from reddiwrap post instance.
                             django_post.set_fields_from_reddiwrap( current_rw_post, self.convert_4_byte_unicode_to_entity )
                             
+                            # sanity check - are django_do_bulk_create and
+                            #    do_update_existing both true?
+                            if ( ( django_do_bulk_create == True ) and ( do_update_existing == True ) ):
+                            
+                                print( "==> In " + me + "(): ERROR - django_do_bulk_create and do_update_existing are both True.  Should never happen." )
+                            
+                            #-- END sanity check. --#
+
                             # bulk create?
-                            if ( django_do_bulk_create == True ):
+                            # - Never bulk create if do_update_existing is True.
+                            if ( ( django_do_bulk_create == True ) and ( do_update_existing == False ) ):
             
-                                # clear out the bulk create list.
+                                # add post to bulk create list.
                                 django_post_create_list.append( django_post )
                 
                             else: #-- not bulk create --#

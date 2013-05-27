@@ -32,7 +32,7 @@ This code collects and stores data from reddit in a database, using django ORM m
 
         touch reddiwrap/__init__.py
 
-- pull in Jon's python\_utilities
+- pull in python\_utilities
 
         git clone https://github.com/jonathanmorgan/python_utilities.git
 
@@ -278,7 +278,8 @@ Then, regardless, you'll need to do the following to set up the collector:
 ### Collect Posts
 
     #============================================================================
-    # ==> Collect Posts    
+    # ==> Collect Posts
+    # - see /examples/collect_posts.py for more details.
     #============================================================================
 
     # collect latest 10 entries from /r/all, store them in database.
@@ -300,6 +301,17 @@ Then, regardless, you'll need to do the following to set up the collector:
     
     # or combine to test - just 350 posts, no more.
     reddit_collector.collect_posts( post_count_limit_IN = 350, after_id_IN = "t3_1d4wyy" )
+
+#### RedditCollector.collect_posts() parameters:
+
+- _subreddit\_IN_ - defaults to "all". Subreddit you want to collect from.
+- _post\_count\_limit\_IN_ - number of posts we want to collect.
+- _until\_id\_IN_ - value of ID we collect until we encounter in the stream (should include type - so begin with "t3_").
+- _until\_date\_IN_ - datetime instance of UTC/GMT date and time we want to collect to (will stop collecting once a date after this is encountered).
+- _subreddit\_in\_list\_IN_ - list of subreddits to limit our collection to (each should begin with "t5_").  If you use this, in most cases, you should leave subreddit_IN = "all".
+- _after\_id\_IN_ - ID you want to get posts after.  Must include type (start with "t3_").  Use this to start at a point in time earlier than the present - to collect from a certain date, find a post around the date you want, collect from that ID on using the after_id_IN parameter.
+- _before\_id\_IN_ - ID before which you want posts.  Must include type (start with "t3_").
+- _do\_update\_existing\_IN_ - Boolean, True if we want to update existing posts that are already in the database, false if not.  Defaults to False.
 
 ### Collect Comments
 
@@ -342,16 +354,6 @@ Then, regardless, you'll need to do the following to set up the collector:
     reddit_collector.collect_comments( comment_rs )
     
     
-### RedditCollector.collect_posts() parameters:
-
-- _subreddit\_IN_ - defaults to "all". Subreddit you want to collect from.
-- _post\_count\_limit\_IN_ - number of posts we want to collect.
-- _until\_id\_IN_ - value of ID we collect until we encounter in the stream (should include type - so begin with "t3_").
-- _until\_date\_IN_ - datetime instance of UTC/GMT date and time we want to collect to (will stop collecting once a date after this is encountered).
-- _subreddit\_in\_list\_IN_ - list of subreddits to limit our collection to (each should begin with "t5_").  If you use this, in most cases, you should leave subreddit_IN = "all".
-- _after\_id\_IN_ - ID you want to get posts after.  Must include type (start with "t3_").  Use this to start at a point in time earlier than the present - to collect from a certain date, find a post around the date you want, collect from that ID on using the after_id_IN parameter.
-- _before\_id\_IN_ - ID before which you want posts.  Must include type (start with "t3_").
-
 ### Reddiwrap Usage
 
     # just want a ReddiWrap instance?  Initialize collecter like above, then...

@@ -550,6 +550,7 @@ class Abstract_Post( models.Model ):
     
             self.modhash = instance_IN.modhash             # base36 string for communicating with account
             self.reddit_id = instance_IN.id                # base36 id for a post (usually 5 characters)
+            self.reddit_full_id = instance_IN.name                   # example: t1_czwe3. t# is content type, the rest is the ID
             self.name = instance_IN.name                   # example: t1_czwe3. t# is content type, the rest is the ID
             self.title = safe_string( instance_IN.title, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )  # Title of post
             self.url = safe_string( instance_IN.url, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN ) # URL to post
