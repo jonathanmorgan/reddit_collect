@@ -470,8 +470,8 @@ class Abstract_Post( models.Model ):
     # Django model fields.
     #============================================================================
 
-    reddit_id = models.CharField( max_length = 255)
-    reddit_full_id = models.CharField( max_length = 255)
+    reddit_id = models.CharField( max_length = 255, db_index = True )
+    reddit_full_id = models.CharField( max_length = 255, db_index = True )
     name = models.TextField( null = True, blank = True )
     title = models.TextField( null = True, blank = True )
     url = models.TextField( null = True, blank = True )
@@ -479,11 +479,11 @@ class Abstract_Post( models.Model ):
     author_name = models.TextField( null = True, blank = True )
     author_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
     domain = models.ForeignKey( Domain, null = True, blank = True )
-    domain_name = models.CharField( max_length = 255, null = True, blank = True )
+    domain_name = models.CharField( max_length = 255, null = True, blank = True, db_index = True )
     domain_long_name = models.TextField( null = True, blank = True )
     subreddit = models.ForeignKey( Subreddit, null = True, blank = True )
     subreddit_name = models.TextField( null = True, blank = True )
-    subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
+    subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True, db_index = True )
     permalink = models.TextField( null = True, blank = True )
     is_self = models.BooleanField( blank = True, default = False )
     clicked = models.BooleanField( blank = True, default = False )
