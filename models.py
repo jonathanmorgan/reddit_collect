@@ -357,12 +357,6 @@ class User( Abstract_User ):
 class Abstract_Domain( models.Model ):
 
     #============================================================================
-    # Constants-ish
-    #============================================================================
-
-    # create list of multimedia domains?
-
-    #============================================================================
     # Django model fields.
     #============================================================================
 
@@ -759,8 +753,8 @@ class Abstract_Comment( models.Model ):
     # Django model fields.
     #============================================================================
 
-    reddit_id = models.CharField( max_length = 255 )
-    reddit_full_id = models.CharField( max_length = 255, null = True, blank = True )
+    reddit_id = models.CharField( max_length = 255, db_index = True )
+    reddit_full_id = models.CharField( max_length = 255, null = True, blank = True, db_index = True )
     name = models.TextField( null = True, blank = True )
     link_id = models.CharField( max_length = 255 )
     parent = models.ForeignKey( 'self', null = True, blank = True )
@@ -774,7 +768,7 @@ class Abstract_Comment( models.Model ):
     body_html = models.TextField( null = True, blank = True )
     subreddit = models.ForeignKey( Subreddit, null = True, blank = True )
     subreddit_name = models.TextField( null = True, blank = True )
-    subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True )
+    subreddit_reddit_id = models.CharField( max_length = 255, null = True, blank = True, db_index = True )
     upvotes = models.IntegerField( null = True, blank = True )
     downvotes = models.IntegerField( null = True, blank = True )
     score = models.IntegerField( null = True, blank = True )

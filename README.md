@@ -189,20 +189,6 @@ Then it isn't working (that is a 4-byte Unicode character that MySQL's 3-byte li
 
 ### Set up database - all versions:
 
-- Create indexes on reddit IDs we use to check for duplicates/look up existing records (reddit ID, for example).  _This is really important!  As your table grows, an un-indexed lookup will slow WAY down!_
-
-    - columns on the reddit\_collect\_post table:
-
-            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_id` (reddit_id);
-            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `reddit_full_id` (reddit_full_id);
-            ALTER TABLE `socs_reddit`.`reddit_collect_post` ADD INDEX `subreddit_reddit_id` (subreddit_reddit_id);
-
-    - columns on the reddit\_collect\_comment table:
-
-            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_id` (reddit_id);
-            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `reddit_full_id` (reddit_full_id);
-            ALTER TABLE `socs_reddit`.`reddit_collect_comment` ADD INDEX `subreddit_reddit_id` (subreddit_reddit_id);
-
 - You might need to also tweak the mysql configuration.  On ubuntu, this is in /etc/mysql/my.cnf:
 
     - set encoding parameters - MySQL < 5.5.2:
