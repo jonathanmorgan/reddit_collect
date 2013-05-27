@@ -334,6 +334,7 @@ class RedditCollector( BasicRateLimited ):
                        subreddit_in_list_IN = [],
                        after_id_IN = None,
                        before_id_IN = None,
+                       do_update_existing_IN = False,
                        *args,
                        **kwargs ):
     
@@ -353,6 +354,7 @@ class RedditCollector( BasicRateLimited ):
         - subreddit_in_list_IN - list of subreddits to limit our collection to (each should begin with "t5_").  If you use this, in most cases, you should leave subreddit_IN = "all".
         - after_id_IN - ID you want to get posts after.  Must include type (start with "t3_").
         - before_id_IN - ID before which you want posts.  Must include type (start with "t3_").
+        - do_update_existing_IN - Boolean, True if we want to update existing posts that are already in the database, false if not.  Defaults to False.
         
         Parameters to come (TK):
         - start_date_IN - datetime instance of date and time after which we want to collect (will ignore until a post is greater-than-or-equal to this date).  For now, to collect from a certain date, find a post around the date you want, collect from that ID on using the after_id_IN parameter.
@@ -376,6 +378,7 @@ class RedditCollector( BasicRateLimited ):
         current_post_created = ""
         current_post_created_dt = None
         current_post_subreddit_id = ""
+        do_update_existing = False
 
         # variables for storing post in database.
         django_do_bulk_create = True
@@ -383,6 +386,7 @@ class RedditCollector( BasicRateLimited ):
         django_bulk_create_count = -1
         django_current_create_count = -1
         django_post = None
+        is_post_in_database = False
         
         # variables for exception handling.
         exception_type = ""
@@ -391,6 +395,7 @@ class RedditCollector( BasicRateLimited ):
         
         # variables for summary information
         new_posts_processed = -1
+        update_count = -1
         first_reddit_id_processed = ""
         start_dt = None
         temp_dt = None
@@ -401,9 +406,19 @@ class RedditCollector( BasicRateLimited ):
         # initialize variables
         post_count = 0
         new_posts_processed = 0
+        update_count = 0
         django_do_bulk_create = self.do_bulk_create
         django_bulk_create_count = 0
         start_dt = datetime.datetime.now()
+        
+        # updating existing?  If so, then can't do bulk create.
+        do_update_existing = do_update_existing_IN
+        if ( do_update_existing == True ):
+        
+            # we are updating existing.  No bulk create.
+            django_do_bulk_create = False
+        
+        #-- END check to see if we update existing --#
 
         # create URL - first, add in reddit, limit.
         api_url = "/r/%s/new?limit=100" % subreddit_IN
@@ -479,6 +494,9 @@ class RedditCollector( BasicRateLimited ):
                 current_post_subreddit_id = current_rw_post.subreddit_id
                 current_post_subreddit_name = current_rw_post.subreddit
                 current_post_url = current_rw_post.url
+                
+                # initialize variables
+                is_post_in_database = False
                 
                 if ( self.debug_flag == True ):
     
@@ -556,27 +574,43 @@ class RedditCollector( BasicRateLimited ):
                     
                             # lookup post.
                             django_post = reddit_collect.models.Post.objects.get( reddit_id = current_post_reddit_id )
-        
-                            print( "In " + me + ": reddit post " + current_post_reddit_id + " is already in database - moving on." )
-                        
+
+                            # post is in database
+                            is_post_in_database = True
+                            # print( "In " + me + ": reddit post " + current_post_reddit_id + " is already in database." )
+                            
                         except:
                         
-                            # Not found.  Set to None.
-                            django_post = None
+                            # Not found.  Create new instance, set flag.
+                            django_post = reddit_collect.models.Post()
+                            is_post_in_database = False
                         
                         #-- END - check for post in database --#
                         
                         # ==> Got existing?  (Could put this in except, still not
                         #    sure how I feel about using exceptions for program
                         #    flow)
-                        if ( django_post == None ):
-        
-                            # not in database.  Add it.
-                            new_posts_processed += 1
+                        # OLD - allowing for update now.
+                        #if ( django_post == None ):
+
+                        # ==> Do we process this post?  We do if:
+                        # - post is not in database. - OR -
+                        # - post is in database, but update flag is true.
+                        if ( ( is_post_in_database == False ) or ( ( is_post_in_database == True ) and ( do_update_existing == True ) ) )
+                        
+                            # Update appropriate counter
+                            if ( is_post_in_database == True ):
+
+                                # in database - increment update count.
+                                update_count += 1
+
+                            else:
                             
-                            # create model instance.
-                            django_post = reddit_collect.models.Post()
+                                # not in database.  Increment new post count.
+                                new_posts_processed += 1
                             
+                            #-- END counter increment. --#
+
                             # set fields from reddiwrap post instance.
                             django_post.set_fields_from_reddiwrap( current_rw_post, self.convert_4_byte_unicode_to_entity )
                             
@@ -699,6 +733,12 @@ class RedditCollector( BasicRateLimited ):
         # output overall summary
         print( "==> Posts processed: " + str( post_count ) )
         print( "==> New posts: " + str( new_posts_processed ) )
+
+        if ( do_update_existing == True ):
+        
+            print( "==> Updated posts: " + str( update_count ) )
+        
+        #-- END check to see if we are updating. --#
         
         if ( django_do_bulk_create == True ):
         

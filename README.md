@@ -27,6 +27,10 @@ This code collects and stores data from reddit in a database, using django ORM m
 - pull in reddiwrap
 
         git clone https://github.com/derv82/reddiwrap.git
+        
+- add empty file named "\_\_init\_\_.py" to the reddiwrap folder, so it can be accessed as a python module.
+
+        touch reddiwrap/__init__.py
 
 - pull in Jon's python\_utilities
 
