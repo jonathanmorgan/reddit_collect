@@ -1,3 +1,6 @@
+# python imports
+import datetime
+
 # import the RedditCollector class
 from reddit_collect.redditCollector import RedditCollector
 
@@ -53,5 +56,8 @@ reddit_collector.convert_4_byte_unicode_to_entity = True
 # update existing posts after a certain ID until a certain datetime.
 boundary_date = datetime.datetime( 2013, 4, 1, 0, 0, 0 )
 
-# first, just try 300.
-reddit_collector.collect_posts( until_date_IN = boundary_date, after_id_IN = "t3_1dk89v", do_update_existing_IN = True, post_count_limit_IN = 300 )
+# to test, just try 300.
+#reddit_collector.collect_posts( until_date_IN = boundary_date, after_id_IN = "t3_1dk89v", do_update_existing_IN = True, post_count_limit_IN = 300 )
+
+# do it.
+reddit_collector.collect_posts( until_date_IN = boundary_date, after_id_IN = "t3_1dk89v", do_update_existing_IN = True )
