@@ -464,7 +464,11 @@ class Abstract_Post( models.Model ):
         ( COMMENT_COLLECTION_STATUS_ONGOING, 'Ongoing' ),
         ( COMMENT_COLLECTION_STATUS_DONE, 'Done' ),
     )
-    
+
+    # SQL constants
+    SQL_AND = "AND"
+    SQL_OR = "OR"
+
 
     #============================================================================
     # Django model fields.
@@ -543,6 +547,53 @@ class Abstract_Post( models.Model ):
     #-- END Meta class --#
 
 
+    #============================================================================
+    # class methods
+    #============================================================================
+
+
+    @classmethod
+    def sql_text_filter( cls, filter_list_IN = [], and_or_or_IN = SQL_OR, *args, **kwargs ):
+
+        # return reference
+        sql_OUT = ""
+        
+        # declare variables
+        current_prefix = ""
+        current_filter = ""
+        current_filter_lower = ""
+        
+        # does filter list have something in it?
+        if ( len( filter_list_IN ) > 0 ):
+        
+            # it does.  output SQL.
+            current_prefix = ""
+            
+            # loop over filters.
+            for current_filter in filter_list_IN:
+            
+                # convert to lower case
+                current_filter_lower = current_filter.lower()
+            
+                # add to SQL
+                sql_OUT += current_prefix
+                sql_OUT += " ("
+                sql_OUT += " ( LOWER( title ) LIKE '%" + current_filter_lower + "%' )"
+                sql_OUT += " OR ( LOWER( selftext ) LIKE '%" + current_filter_lower + "%' )"
+                sql_OUT += " )"
+                
+                # update the current prefix
+                current_prefix = " " + and_or_or_IN
+
+            #-- END loop over filter text --#
+
+        #-- END check to see if filter list have something in it --#
+        
+        return sql_OUT
+    
+    #-- END method sql_text_filter() --#
+
+    
     #============================================================================
     # instance methods
     #============================================================================
