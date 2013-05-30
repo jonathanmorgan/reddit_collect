@@ -360,7 +360,7 @@ class Abstract_Domain( models.Model ):
     # Django model fields.
     #============================================================================
 
-    name = models.CharField( max_length = 255)
+    name = models.CharField( max_length = 255, db_index = True )
     long_name = models.TextField( null = True, blank = True )
     is_self_post = models.BooleanField( blank = True, default = False )
     is_news = models.BooleanField( blank = True, default = False )
