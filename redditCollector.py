@@ -36,6 +36,7 @@ import reddit_collect.models
 # python_utilities
 from python_utilities.rate_limited.basic_rate_limited import BasicRateLimited
 from python_utilities.strings.string_helper import StringHelper
+from python_utilities.email.email_helper import EmailHelper
 
 # ReddiWrapper
 from reddiwrap.ReddiWrap import ReddiWrap
@@ -71,6 +72,10 @@ class RedditCollector( BasicRateLimited ):
     password = ""
     cookie_file_path = ""
     
+    # email helpers.
+    email_helper = None
+    email_status_address = ""
+    
     # rate limiting - in parent class BasicRateLimited.
     #do_manage_time = True
     #rate_limit_in_seconds = 2
@@ -82,6 +87,9 @@ class RedditCollector( BasicRateLimited ):
     # encoding, to deal with utf8 in mysql actually just allowing for up to
     #    3-byte unicode characters, not all (4-byte and above).
     convert_4_byte_unicode_to_entity = False
+    
+    # error handling
+    error_limit_count = 10
     
     # debug_flag
     debug_flag = False
@@ -109,6 +117,22 @@ class RedditCollector( BasicRateLimited ):
         do_manage_time = True
         rate_limit_in_seconds = 2
         request_start_time = None
+        
+        # performance
+        do_bulk_create = True
+        
+        # encoding
+        convert_4_byte_unicode_to_entity = True
+        
+        # email
+        email_helper = None
+        email_status_address = ""
+        
+        # error handling
+        error_limit_count = 10
+        
+        # debug
+        debug_flag = False
 
     #-- END constructor --#
 
@@ -120,6 +144,7 @@ class RedditCollector( BasicRateLimited ):
 
     def collect_comments( self, 
                           posts_qs_IN = None,
+                          do_update_existing_IN = False,
                           *args,
                           **kwargs ):
     
@@ -130,6 +155,7 @@ class RedditCollector( BasicRateLimited ):
            
         Parameters:
         - posts_qs_IN - defaults to None.  QuerySet containing posts you want to collect comments for.  If None, will collect for all posts in database whose comment status is not "done".
+        - do_update_existing_IN - Boolean, True if we want to update existing comments that are already in the database, false if not.  Defaults to False.
            
         Postconditions: Stores comments for each post to database using django
            model classes.  Returns a status message.
@@ -161,6 +187,16 @@ class RedditCollector( BasicRateLimited ):
         post_counter = -1
         continue_collecting = True
         current_rw_post = None
+        do_update_existing = False
+        
+        # variables for dealing with intermittent connection problems.
+        comments_collected = False
+        connection_error_count = -1
+        temp_exception_string = ""
+        exception_details = ""
+        error_email_subject = ""
+        error_email_message = ""
+        error_email_status = ""
 
         # variables for storing post in database.
         django_do_bulk_create = True
@@ -177,6 +213,10 @@ class RedditCollector( BasicRateLimited ):
         new_posts_processed = -1
         first_reddit_id_processed = ""
         start_dt = ""
+        temp_string = ""
+        summary_string = ""
+        summary_email_subject = ""
+        summary_email_message = ""
 
         # get reddiwrap instance
         reddiwrap = self.get_reddiwrap_instance()
@@ -188,6 +228,19 @@ class RedditCollector( BasicRateLimited ):
         django_bulk_create_list = []
         django_bulk_create_count = 0
         start_dt = datetime.datetime.now()
+        
+        # set bulk create flag - for now, always doing bulk create of comments
+        #    unless update is true.
+        #django_do_bulk_create =  self.do_bulk_create
+
+        # updating existing?  If so, then can't do bulk create.
+        do_update_existing = do_update_existing_IN
+        if ( do_update_existing == True ):
+        
+            # we are updating existing.  No bulk create.
+            django_do_bulk_create = False
+        
+        #-- END check to see if we update existing --#
 
         # check to see if we have a QuerySet
         if ( ( posts_qs_IN ) and ( posts_qs_IN != None ) ):
@@ -237,7 +290,83 @@ class RedditCollector( BasicRateLimited ):
                 current_rw_post = current_post.create_reddiwrap_post()
                 
                 # use reddiwrap to load comments.
-                reddiwrap.fetch_comments( current_rw_post );
+                
+                # wrap in loop
+                comments_collected = False
+                connection_error_count = 0
+                while ( comments_collected == False ):
+
+                    try:
+                    
+                        reddiwrap.fetch_comments( current_rw_post );
+                        comments_collected = True
+                    
+                    except Exception as e:
+                    
+                        # set flag to False
+                        comments_collected = False
+                        
+                        # get exception details:
+                        exception_type, exception_value, exception_traceback = sys.exc_info()
+                        
+                        exception_details = ""
+                        
+                        temp_exception_string = "====> In " + me + ": reddiwrap.fetch_comments() threw exception, fetching comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); post " + str( post_counter ) + " of " + str( post_count )
+                        print( temp_exception_string )
+                        exception_details += temp_exception_string
+                        
+                        temp_exception_string = "      - args = " + str( e.args )
+                        print( temp_exception_string )
+                        exception_details += temp_exception_string
+
+                        temp_exception_string = "      - type = " + str( exception_type )
+                        print( temp_exception_string )
+                        exception_details += temp_exception_string
+                        
+                        temp_exception_string = "      - value = " + str( exception_value )
+                        print( temp_exception_string )
+                        exception_details += temp_exception_string
+                        
+                        temp_exception_string = "      - traceback = " + str( exception_traceback )
+                        print( temp_exception_string )
+                        exception_details += temp_exception_string
+
+                        # increment error count.
+                        connection_error_count += 1
+
+                        # are we up to error limit yet?
+                        if ( connection_error_count >= self.error_limit_count ):
+
+                            # yes - send email about problems?
+                            if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
+                            
+                                # yes.  Build email
+                                error_email_subject = "Connection problem with comment collector."
+                                error_email_message = "Comment collector failed to connect " + str( self.error_limit_count ) + " times.  Details:\n"
+                                error_email_message += exception_details
+                                
+                                # send it.
+                                error_email_status = self.email_send( error_email_message, error_email_subject, self.email_status_address, self.email_status_address )
+                                
+                                # print status
+                                print( "===> Error email sent: " + error_email_status )
+                            
+                            #-- END check to see if we send error email --#
+                            
+                            # throw exception
+                            raise( e )
+                            
+                        else:
+                        
+                            # haven't reached error limit yet.  pause 10 seconds
+                            #    then try again.
+                            time.sleep( 10 )
+                        
+                        #-- END check to see if we've exceeded error limit. --#
+                        
+                    #-- END try/except around collecting comments from reddit. --#
+                    
+                #-- END loop around collecting comments --#
                 
                 # bulk?
                 if ( django_do_bulk_create == True ):
@@ -282,7 +411,7 @@ class RedditCollector( BasicRateLimited ):
                 else:
                 
                     # process comment list (recursive)
-                    django_current_create_count = self.process_comments( current_post, current_rw_post.comments )
+                    django_current_create_count = self.process_comments( post_IN = current_post, comment_list_IN = current_rw_post.comments, do_update_existing_IN = do_update_existing )
                 
                     # increment total count
                     comment_create_count += django_current_create_count
@@ -310,16 +439,49 @@ class RedditCollector( BasicRateLimited ):
         #-- END loop over posts. --#
         
         # output overall summary
-        print( "==> Posts passed in: " + str( post_count ) )
-        print( "==> Posts processed: " + str( post_counter ) )
-        print( "==> Comments created: " + str( comment_create_count ) )
-        print( "==> Collection started: " + str( start_dt ) )
+        summary_string = ""
+
+        temp_string = "==> Posts passed in: " + str( post_count )
+        print( temp_string )
+        summary_string += temp_string
+
+        temp_string = "==> Posts processed: " + str( post_counter )        
+        print( temp_string )
+        summary_string += "\n" + temp_string
+
+        temp_string = "==> Comments created: " + str( comment_create_count )
+        print( temp_string )
+        summary_string += "\n" + temp_string
+
+        temp_string = "==> Collection started: " + str( start_dt )
+        print( temp_string )
+        summary_string += "\n" + temp_string
 
         end_dt = datetime.datetime.now()
-        print( "==> Collection ended: " + str( end_dt ) )
+        temp_string = "==> Collection ended: " + str( end_dt )
+        print( temp_string )
+        summary_string += "\n" + temp_string
         
         duration_td = end_dt - start_dt
-        print( "==> Duration: " + str( duration_td ) )
+        temp_string = "==> Duration: " + str( duration_td )
+        print( temp_string )
+        summary_string += "\n" + temp_string
+        
+        # email summary?
+        if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
+        
+            # yes.  Build email
+            summary_email_subject = "Comment collection complete - " + str( datetime.datetime.now() )
+            summary_email_message = "Comment collection summary:\n"
+            summary_email_message += summary_string
+            
+            # send it.
+            summary_email_status = self.email_send( summary_email_message, summary_email_subject, self.email_status_address, self.email_status_address )
+            
+            # print status
+            print( "==> Summary email sent: " + summary_email_status )
+        
+        #-- END check to see if email summary --#
 
         return status_OUT
     
@@ -399,6 +561,10 @@ class RedditCollector( BasicRateLimited ):
         first_reddit_id_processed = ""
         start_dt = None
         temp_dt = None
+        temp_string = ""
+        summary_string = ""
+        summary_email_subject = ""
+        summary_email_message = ""
 
         # get reddiwrap instance
         reddiwrap = self.get_reddiwrap_instance()
@@ -740,31 +906,70 @@ class RedditCollector( BasicRateLimited ):
         #-- END outer reddit collection loop --#
         
         # output overall summary
-        print( "==> Posts processed: " + str( post_count ) )
-        print( "==> New posts: " + str( new_posts_processed ) )
+        summary_string = ""
+        
+        temp_string = "==> Posts processed: " + str( post_count )
+        print( temp_string )
+        summary_string += temp_string
+        
+        temp_string = "==> New posts: " + str( new_posts_processed )
+        print( temp_string )
+        summary_string += "\n" + temp_string
 
         if ( do_update_existing == True ):
         
-            print( "==> Updated posts: " + str( update_count ) )
+            temp_string = "==> Updated posts: " + str( update_count )
+            print( temp_string )
+            summary_string += "\n" + temp_string
         
         #-- END check to see if we are updating. --#
         
         if ( django_do_bulk_create == True ):
         
-            print( "==> Posts bulk_create()'ed: " + str( django_bulk_create_count ) )
+            temp_string = "==> Posts bulk_create()'ed: " + str( django_bulk_create_count )
+            print( temp_string )
+            summary_string += "\n" + temp_string
         
         #-- END check to see if bulk create --#
         
-        print( "==> First reddit ID processed: " + first_reddit_id_processed )
-        print( "==> Last reddit ID processed: " + current_post_reddit_id )
-        print( "==> Collection started: " + str( start_dt ) )
+        temp_string = "==> First reddit ID processed: " + first_reddit_id_processed
+        print( temp_string )
+        summary_string += "\n" + temp_string
+
+        temp_string = "==> Last reddit ID processed: " + current_post_reddit_id
+        print( temp_string )
+        summary_string += "\n" + temp_string
+
+        temp_string = "==> Collection started: " + str( start_dt )
+        print( temp_string )
+        summary_string += "\n" + temp_string
 
         end_dt = datetime.datetime.now()
-        print( "==> Collection ended: " + str( end_dt ) )
+        temp_string = "==> Collection ended: " + str( end_dt )
+        print( temp_string )
+        summary_string += "\n" + temp_string
         
         duration_td = end_dt - start_dt
-        print( "==> Duration: " + str( duration_td ) )
+        temp_string = "==> Duration: " + str( duration_td )
+        print( temp_string )
+        summary_string += "\n" + temp_string
         
+        # email summary?
+        if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
+        
+            # yes.  Build email
+            summary_email_subject = "Post collection complete - " + str( datetime.datetime.now() )
+            summary_email_message = "Post collection summary:\n"
+            summary_email_message += summary_string
+            
+            # send it.
+            summary_email_status = self.email_send( summary_email_message, summary_email_subject, self.email_status_address, self.email_status_address )
+            
+            # print status
+            print( "==> Summary email sent: " + summary_email_status )
+        
+        #-- END check to see if email summary --#
+
         return status_OUT
     
     #-- END method collect_posts() --#
@@ -864,6 +1069,78 @@ class RedditCollector( BasicRateLimited ):
     #-- END create_reddiwrap_instance() --#
 
 
+    def email_initialize( self, smtp_host_IN = "localhost", smtp_port_IN = "", smtp_use_ssl_IN = False, smtp_username_IN = "", smtp_password_IN = "", *args, **kwargs ):
+    
+        '''
+        Accepts properties that can be used to initialize an email helper
+           instance.  Initializes object, stores it in instance variable.
+        '''
+    
+        # declare variables
+        my_email_helper = None
+        
+        # create email helper
+        my_email_helper = EmailHelper()
+        
+        # set host.
+        my_email_helper.set_smtp_server_host( smtp_host_IN )
+
+        # set port?
+        if ( ( smtp_port_IN ) and ( smtp_port_IN != None ) and ( smtp_port_IN != "" ) ):
+        
+            my_email_helper.set_smtp_server_port( smtp_port_IN )
+        
+        #-- END check to see if port passed in. --#
+        
+        # use ssl?
+        my_email_helper.set_smtp_server_use_SSL( smtp_use_ssl_IN )
+        
+        # set username?
+        if ( ( smtp_username_IN ) and ( smtp_username_IN != None ) and ( smtp_username_IN != "" ) ):
+        
+            my_email_helper.set_smtp_server_username( smtp_username_IN )
+        
+        #-- END check to see if username passed in --#
+
+        # set password?
+        if ( ( smtp_password_IN ) and ( smtp_password_IN != None ) and ( smtp_password_IN != "" ) ):
+        
+            my_email_helper.set_smtp_server_password( smtp_password_IN )
+        
+        #-- END check to see if password passed in --#
+        
+        # store in instance variable.
+        self.email_helper = my_email_helper
+        
+    #-- END method email_initialize() --#    
+    
+    
+    def email_send( self, message_IN = None, subject_IN = None, from_address_IN = None, to_address_IN = None ):
+
+        '''
+        Uses nested email_helper instance to send email.  Returns status message.
+           If status returned is email_helper.STATUS_SUCCESS, then success, if
+           anything else, it is an error message explaining why the email was not
+           sent.
+        '''
+    
+        # return reference
+        status_OUT = ""
+    
+        # declare variables
+        my_email_helper = None
+        
+        # get email helper
+        my_email_helper = self.email_helper
+        
+        # send email
+        status_OUT = my_email_helper.send_email( message_IN, subject_IN, from_address_IN, to_address_IN )
+        
+        return status_OUT
+    
+    #-- END method email_send() --#
+    
+    
     def get_reddiwrap_instance( self, *args, **kwargs ):
     
         '''
@@ -899,7 +1176,13 @@ class RedditCollector( BasicRateLimited ):
     #-- END get_reddiwrap_instance() --#
 
 
-    def process_comments( self, post_IN = None, comment_list_IN = [], parent_comment_IN = None, *args, **kwargs ):
+    def process_comments( self,
+                          post_IN = None,
+                          comment_list_IN = [],
+                          parent_comment_IN = None,
+                          do_update_existing_IN = False,
+                          *args,
+                          **kwargs ):
         
         '''
         Accepts django reddit_collect.models.Post instance, list of reddiwrap
@@ -916,6 +1199,7 @@ class RedditCollector( BasicRateLimited ):
         - post_IN - reddit_collect.models.Post instance, so we can relate comments to their post.
         - comment_list_IN - list of reddiwrap Comment instances we are to store in the database.
         - parent_comment_IN - reddit_collect.models.Comment instance of parent comment, so we can relate the child comment back to it.
+        - do_update_existing_IN - Boolean, True if we want to update existing comments that are already in the database, false if not.  Defaults to False.
         '''
     
         # return reference
@@ -923,17 +1207,23 @@ class RedditCollector( BasicRateLimited ):
         
         # declare variables
         me = "process_comments"
+        do_update_existing = False
         comment_count = -1
+        update_count = -1
         new_comment_count = -1
         current_rw_comment = None
         comment_reddit_full_id = ""
         django_comment = None
+        is_comment_in_database = False
         django_do_bulk_create = False
         comment_children = None
         child_count = -1
         
         # initialize variables
         comment_count = 0
+        
+        # updating existing?
+        do_update_existing = do_update_existing_IN
         
         # do we have a comment list
         if ( ( comment_list_IN ) and ( len( comment_list_IN ) > 0 ) ):
@@ -952,28 +1242,47 @@ class RedditCollector( BasicRateLimited ):
             
                     # lookup comment.
                     django_comment = reddit_collect.models.Comment.objects.get( reddit_full_id = comment_reddit_full_id )
+                    
+                    # post is in database
+                    is_comment_in_database = True
 
                     print( "In " + me + ": reddit comment " + comment_reddit_full_id + " is already in database - moving on." )
                 
                 except:
                 
-                    # Not found.  Set to None.
-                    django_comment = None
+                    # Not found.   Create new instance, set flag.
+                    django_comment = reddit_collect.models.Comment()
+                    is_comment_in_database = False
                 
                 #-- END - check for comment in database --#
-                
-                # !TODO - update as well as create?
                 
                 # ==> Got existing?  (Could put this in except, still not
                 #    sure how I feel about using exceptions for program
                 #    flow)
-                if ( django_comment == None ):
+                # OLD - allowing for update now.
+                #if ( django_comment == None ):
 
-                    # not in database.  Add it.
-                    new_comment_count += 1
+                # ==> Do we process this comment?  We do if:
+                # - comment is not in database. - OR -
+                # - comment is in database, but update flag is true.
+                if ( ( is_comment_in_database == False ) or ( ( is_comment_in_database == True ) and ( do_update_existing == True ) ) ):
+
+                    # Update appropriate counter
+                    if ( is_post_in_database == True ):
+
+                        # in database - increment update count.
+                        update_count += 1
+
+                    else:
                     
+                        # not in database.  Increment new post count.
+                        new_comment_count += 1
+                    
+                    #-- END counter increment. --#
+
                     # create model instance.
-                    django_comment = reddit_collect.models.Comment()
+                    # OLD - already have instance now.
+                    #django_comment = reddit_collect.models.Comment()
                     
                     # set fields from reddiwrap instance.
                     django_comment.set_fields_from_reddiwrap( current_rw_comment, self.convert_4_byte_unicode_to_entity )
@@ -1026,7 +1335,7 @@ class RedditCollector( BasicRateLimited ):
                 if ( ( comment_children ) and ( len( comment_children ) > 0 ) ):
                 
                     # yes.  Recurse!
-                    child_count = self.process_comments( post_IN, comment_children, django_comment )
+                    child_count = self.process_comments( post_IN, comment_children, django_comment, do_update_existing_IN )
                     
                     # add child count to comment_count
                     comment_count += child_count

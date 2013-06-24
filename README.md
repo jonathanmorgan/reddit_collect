@@ -449,7 +449,7 @@ Then, regardless, you'll need to do the following to set up the collector:
 
 Copyright 2012, 2013 Jonathan Morgan
 
-This file is part of [http://github.com/jonathanmorgan/reddit_collect](http://github.com/jonathanmorgan/reddit_collect).
+This file is part of [http://github.com/jonathanmorgan/reddit\_collect](http://github.com/jonathanmorgan/reddit_collect).
 
 reddit\_collect is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as published by
@@ -462,5 +462,5 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public License
-along with [http://github.com/jonathanmorgan/reddit_collect](http://github.com/jonathanmorgan/reddit_collect).  If not, see
+along with [http://github.com/jonathanmorgan/reddit\_collect](http://github.com/jonathanmorgan/reddit_collect).  If not, see
 [http://www.gnu.org/licenses/](http://www.gnu.org/licenses/).
