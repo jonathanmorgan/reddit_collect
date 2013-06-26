@@ -34,9 +34,10 @@ import django.db
 import reddit_collect.models
 
 # python_utilities
+from python_utilities.email.email_helper import EmailHelper
+from python_utilities.exceptions.exception_helper import ExceptionHelper
 from python_utilities.rate_limited.basic_rate_limited import BasicRateLimited
 from python_utilities.strings.string_helper import StringHelper
-from python_utilities.email.email_helper import EmailHelper
 
 # ReddiWrapper
 from reddiwrap.ReddiWrap import ReddiWrap
@@ -90,6 +91,7 @@ class RedditCollector( BasicRateLimited ):
     
     # error handling
     error_limit_count = 10
+    exception_helper = ExceptionHelper()
     
     # debug_flag
     debug_flag = False
@@ -114,25 +116,26 @@ class RedditCollector( BasicRateLimited ):
         self.cookie_file_path = ""
         
         # flag to say if this instance should manage time.
-        do_manage_time = True
-        rate_limit_in_seconds = 2
-        request_start_time = None
+        self.do_manage_time = True
+        self.rate_limit_in_seconds = 2
+        self.request_start_time = None
         
         # performance
-        do_bulk_create = True
+        self.do_bulk_create = True
         
         # encoding
-        convert_4_byte_unicode_to_entity = True
+        self.convert_4_byte_unicode_to_entity = True
         
         # email
-        email_helper = None
-        email_status_address = ""
+        self.email_helper = None
+        self.email_status_address = ""
         
         # error handling
-        error_limit_count = 10
+        self.error_limit_count = 10
+        self.exception_helper = ExceptionHelper()
         
         # debug
-        debug_flag = False
+        self.debug_flag = False
 
     #-- END constructor --#
 
@@ -194,6 +197,7 @@ class RedditCollector( BasicRateLimited ):
         connection_error_count = -1
         temp_exception_string = ""
         exception_details = ""
+        exception_message = ""
         error_email_subject = ""
         error_email_message = ""
         error_email_status = ""
@@ -255,188 +259,166 @@ class RedditCollector( BasicRateLimited ):
         
         #-- END check to see if posts passed in --#
         
-        # loop over posts.
-        post_counter = 0
-        continue_collecting = True
-        post_count = len( posts_to_process_qs )
-        for current_post in posts_to_process_qs:
+        # !TODO - big outer try/except.
+        try:
         
-            # see if it is OK to continue.
-
-            # call may_i_continue() if other than first post
-            if ( post_counter > 0 ):
+            # loop over posts.
+            post_counter = 0
+            continue_collecting = True
+            post_count = len( posts_to_process_qs )
+            for current_post in posts_to_process_qs:
             
-                # not first post.  call may_i_continue()
-                continue_collecting = self.may_i_continue()
-            
-            #-- END check to see if first post --#
-            
-            # OK to continue?
-            if continue_collecting == True:
-            
-                # increment post counter
-                post_counter += 1
-                
-                print( "- " + str( post_counter ) + " of " + str( post_count ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - created on " + str( current_post.created_utc_dt ) )
-
-                # memory management.
-                gc.collect()
-                django.db.reset_queries()
+                # see if it is OK to continue.
     
-                # set request start time (OK to be a little inefficient)
-                self.start_request()
-
-                # populate a reddiwrap Post instance.
-                current_rw_post = current_post.create_reddiwrap_post()
+                # call may_i_continue() if other than first post
+                if ( post_counter > 0 ):
                 
-                # use reddiwrap to load comments.
+                    # not first post.  call may_i_continue()
+                    continue_collecting = self.may_i_continue()
                 
-                # wrap in loop
-                comments_collected = False
-                connection_error_count = 0
-                while ( comments_collected == False ):
-
-                    try:
-                    
-                        reddiwrap.fetch_comments( current_rw_post );
-                        comments_collected = True
-                    
-                    except Exception as e:
-                    
-                        # set flag to False
-                        comments_collected = False
-                        
-                        # get exception details:
-                        exception_type, exception_value, exception_traceback = sys.exc_info()
-                        
-                        exception_details = ""
-                        
-                        temp_exception_string = "====> In " + me + ": reddiwrap.fetch_comments() threw exception, fetching comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); post " + str( post_counter ) + " of " + str( post_count )
-                        print( temp_exception_string )
-                        exception_details += temp_exception_string
-                        
-                        temp_exception_string = "      - args = " + str( e.args )
-                        print( temp_exception_string )
-                        exception_details += temp_exception_string
-
-                        temp_exception_string = "      - type = " + str( exception_type )
-                        print( temp_exception_string )
-                        exception_details += temp_exception_string
-                        
-                        temp_exception_string = "      - value = " + str( exception_value )
-                        print( temp_exception_string )
-                        exception_details += temp_exception_string
-                        
-                        temp_exception_string = "      - traceback = " + str( exception_traceback )
-                        print( temp_exception_string )
-                        exception_details += temp_exception_string
-
-                        # increment error count.
-                        connection_error_count += 1
-
-                        # are we up to error limit yet?
-                        if ( connection_error_count >= self.error_limit_count ):
-
-                            # yes - send email about problems?
-                            if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
-                            
-                                # yes.  Build email
-                                error_email_subject = "Connection problem with comment collector."
-                                error_email_message = "Comment collector failed to connect " + str( self.error_limit_count ) + " times.  Details:\n"
-                                error_email_message += exception_details
-                                
-                                # send it.
-                                error_email_status = self.email_send( error_email_message, error_email_subject, self.email_status_address, self.email_status_address )
-                                
-                                # print status
-                                print( "===> Error email sent: " + error_email_status )
-                            
-                            #-- END check to see if we send error email --#
-                            
-                            # throw exception
-                            raise( e )
-                            
-                        else:
-                        
-                            # haven't reached error limit yet.  pause 10 seconds
-                            #    then try again.
-                            time.sleep( 10 )
-                        
-                        #-- END check to see if we've exceeded error limit. --#
-                        
-                    #-- END try/except around collecting comments from reddit. --#
-                    
-                #-- END loop around collecting comments --#
+                #-- END check to see if first post --#
                 
-                # bulk?
-                if ( django_do_bulk_create == True ):
+                # OK to continue?
+                if continue_collecting == True:
                 
-                    # process comment list in bulk (recursive)
-                    django_bulk_create_list = self.process_comments_bulk( current_post, current_rw_post.comments )
+                    # increment post counter
+                    post_counter += 1
                     
-                    # do bulk_create()?
-                    if ( ( django_bulk_create_list ) and ( len( django_bulk_create_list ) > 0 ) ):
+                    print( "- " + str( post_counter ) + " of " + str( post_count ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - created on " + str( current_post.created_utc_dt ) )
+    
+                    # memory management.
+                    gc.collect()
+                    django.db.reset_queries()
+        
+                    # set request start time (OK to be a little inefficient)
+                    self.start_request()
+    
+                    # populate a reddiwrap Post instance.
+                    current_rw_post = current_post.create_reddiwrap_post()
                     
-                        # try/except around saving.
+                    # use reddiwrap to load comments.
+                    
+                    # wrap in loop
+                    comments_collected = False
+                    connection_error_count = 0
+                    while ( comments_collected == False ):
+    
                         try:
-        
-                            # yes.
-                            reddit_collect.models.Comment.objects.bulk_create( django_bulk_create_list )
-                            
-                            # increment total count
-                            django_bulk_create_count = len( django_bulk_create_list )
-                            comment_create_count += django_bulk_create_count
-
+                        
+                            reddiwrap.fetch_comments( current_rw_post, 500 );
+                            comments_collected = True
+                        
                         except Exception as e:
+                        
+                            # set flag to False
+                            comments_collected = False
                             
-                            # error saving.  Probably encoding error.
-        
-                            # get exception details:
-                            exception_type, exception_value, exception_traceback = sys.exc_info()
-                            print( "====> In " + me + ": bulk_create() threw exception, processing comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); count of comments being bulk created = " + str( django_bulk_create_count ) )
-                            print( "      - args = " + str( e.args ) )
-                            print( "      - type = " + str( exception_type ) )
-                            print( "      - value = " + str( exception_value ) )
-                            print( "      - traceback = " + str( exception_traceback ) )
-                            
-                            # send email to let me know this crashed?
-        
-                            # throw exception?
-                            raise( e )
+                            # increment error count.
+                            connection_error_count += 1
+    
+                            # make exception message
+                            exception_message = "In " + me + ": reddiwrap.fetch_comments() threw exception, fetching comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); post " + str( post_counter ) + " of " + str( post_count )
+    
+                            # are we up to error limit yet?
+                            if ( connection_error_count >= self.error_limit_count ):
+    
+                                # yes - send email about problems
+                                error_email_subject = "Connection problem with comment collector."
+                                exception_message = "Comment collector failed to connect " + str( self.error_limit_count ) + " times.  Details:\n" + exception_message
+                                self.process_exception( e, exception_message, True, error_email_subject )
                                 
-                        #-- END try/except around saving. --#
-
-                    #-- END check to see if anything to bulk create. --#
+                                # throw exception
+                                raise( e )
+                                
+                            else:
+                            
+                                # haven't reached error limit yet. Process exception,
+                                #    no email, pause 10 seconds, then try again.
+                                self.process_exception( e, exception_message, False )
+                                time.sleep( 10 )
+                            
+                            #-- END check to see if we've exceeded error limit. --#
+                            
+                        #-- END try/except around collecting comments from reddit. --#
+                        
+                    #-- END loop around collecting comments --#
                     
+                    # bulk?
+                    if ( django_do_bulk_create == True ):
+                    
+                        # process comment list in bulk (recursive)
+                        django_bulk_create_list = self.process_comments_bulk( current_post, current_rw_post.comments )
+                        
+                        # do bulk_create()?
+                        if ( ( django_bulk_create_list ) and ( len( django_bulk_create_list ) > 0 ) ):
+                        
+                            # try/except around saving.
+                            try:
+            
+                                # yes.
+                                reddit_collect.models.Comment.objects.bulk_create( django_bulk_create_list )
+                                
+                                # increment total count
+                                django_bulk_create_count = len( django_bulk_create_list )
+                                comment_create_count += django_bulk_create_count
+    
+                            except Exception as e:
+                                
+                                # error saving.  Probably encoding error.
+            
+                                # send email about problems
+                                error_email_subject = "Problem bulk-saving comments."
+                                exception_message = "In " + me + ": bulk_create() threw exception, processing comments for post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ); count of comments being bulk created = " + str( django_bulk_create_count )
+                                self.process_exception( e, exception_message, True, error_email_subject )
+                                            
+                                # throw exception?
+                                raise( e )
+                                    
+                            #-- END try/except around saving. --#
+    
+                        #-- END check to see if anything to bulk create. --#
+                        
+                    else:
+                    
+                        # process comment list (recursive)
+                        django_current_create_count = self.process_comments( post_IN = current_post, comment_list_IN = current_rw_post.comments, do_update_existing_IN = do_update_existing )
+                    
+                        # increment total count
+                        comment_create_count += django_current_create_count
+                        
+                    #-- END check to see if bulk or not. --#
+                    
+                    # update the post to show that it has been comment-harvested.
+                    if ( current_post.comment_collection_status == reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_NEW ):
+                    
+                        # update status to "ongoing".
+                        current_post.comment_collection_status = reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_ONGOING
+                        current_post.save()
+                    
+                    #-- END check to see if first-time updating comments. --#
+    
                 else:
                 
-                    # process comment list (recursive)
-                    django_current_create_count = self.process_comments( post_IN = current_post, comment_list_IN = current_rw_post.comments, do_update_existing_IN = do_update_existing )
-                
-                    # increment total count
-                    comment_create_count += django_current_create_count
-                    
-                #-- END check to see if bulk or not. --#
-                
-                # update the post to show that it has been comment-harvested.
-                if ( current_post.comment_collection_status == reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_NEW ):
-                
-                    # update status to "ongoing".
-                    current_post.comment_collection_status = reddit_collect.models.Post.COMMENT_COLLECTION_STATUS_ONGOING
-                    current_post.save()
-                
-                #-- END check to see if first-time updating comments. --#
-
-            else:
+                    # may_i_continue() returned False.  Once that happens once,
+                    #    unlikely it will return True ever again.
+                    print( "====> In " + me + ": may_i_continue() returned False.  This shouldn't be possible.  Falling out of loop." )
+                    break                
+                                
+                #-- END check to see if we are OK to continue collecting. --#
             
-                # may_i_continue() returned False.  Once that happens once,
-                #    unlikely it will return True ever again.
-                print( "====> In " + me + ": may_i_continue() returned False.  This shouldn't be possible.  Falling out of loop." )
-                break                
-                            
-            #-- END check to see if we are OK to continue collecting. --#
+            #-- END loop over posts. --#
+            
+        except Exception as e:
         
-        #-- END loop over posts. --#
+            # yes - send email about problems
+            error_email_subject = "Unexpected problem with comment collector."
+            exception_message = "Unexpected problem with comment collector.  Details:\n"
+            self.process_exception( e, exception_message, True, error_email_subject )
+            
+            # throw exception?
+            #raise( e )
+
+        #-- END super try/except around entire loop.
         
         # output overall summary
         summary_string = ""
@@ -467,21 +449,12 @@ class RedditCollector( BasicRateLimited ):
         print( temp_string )
         summary_string += "\n" + temp_string
         
-        # email summary?
-        if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
-        
-            # yes.  Build email
-            summary_email_subject = "Comment collection complete - " + str( datetime.datetime.now() )
-            summary_email_message = "Comment collection summary:\n"
-            summary_email_message += summary_string
-            
-            # send it.
-            summary_email_status = self.email_send( summary_email_message, summary_email_subject, self.email_status_address, self.email_status_address )
-            
-            # print status
-            print( "==> Summary email sent: " + summary_email_status )
-        
-        #-- END check to see if email summary --#
+        # email summary
+        summary_email_subject = "Comment collection complete - " + str( datetime.datetime.now() )
+        summary_email_message = "Comment collection summary:\n"
+        summary_email_message += summary_string
+        summary_email_status = self.email_send_status( summary_email_message, summary_email_subject )
+        print( "==> Summary email status: " + summary_email_status )
 
         return status_OUT
     
@@ -607,303 +580,304 @@ class RedditCollector( BasicRateLimited ):
         
         #-- END check to see if after ID passed in. --#
         
-        # loop until flag is false
-        while continue_collecting == True:
-        
-            print( "In " + me + ": top of loop - " + str( datetime.datetime.now() ) + " - latest post = " + current_post_reddit_id + " ( " + str( current_post_created_dt ) + " ), number " + str( post_count ) + "." )
+        # !TODO - big outer try/except.
+        try:
 
-            # memory management.
-            gc.collect()
-            django.db.reset_queries()
-
-            # set request start time (OK to be a little inefficient)
-            self.start_request()
+            # loop until flag is false
+            while continue_collecting == True:
             
-            # bulk create?
-            if ( django_do_bulk_create == True ):
-            
-                # clear out the bulk create list.
-                django_post_create_list = []
-                
-            #-- END check to see if doing bulk create. --#
-
-            # get first set of results, or grab next set of results.
-            if ( post_count == 0 ):
-
-                # get first set of results for /r/all
-                post_list = reddiwrap.get( api_url )
-                
-            else:
-            
-                # get next set of posts.
-                post_list = reddiwrap.get_next()
-
-            #-- END check to see how we grab more posts. --#
-            
-            temp_dt = datetime.datetime.now()
-            print( "In " + me + ": after retrieving stuff from reddit - " + str( temp_dt ) + "; elapsed: " + str( temp_dt - self.request_start_time ) + " - latest post = " + current_post_reddit_id + " ( " + str( current_post_created_dt ) + " ), number " + str( post_count ) + "." )
-        
-            #--------------------------------------------------------------------
-            # loop over posts.
-            #--------------------------------------------------------------------
-
-            for current_rw_post in post_list:
-
-                # increment post counter.
-                post_count += 1
-            
-                # get info. on current post.
-                current_post_reddit_id = current_rw_post.id
-                current_post_id_with_type = "t3_" + current_post_reddit_id
-                current_post_created = current_rw_post.created_utc
-                current_post_created_dt = datetime.datetime.fromtimestamp( int( current_post_created ) )
-                current_post_subreddit_id = current_rw_post.subreddit_id
-                current_post_subreddit_name = current_rw_post.subreddit
-                current_post_url = current_rw_post.url
-                
-                # initialize variables
-                is_post_in_database = False
-                
-                if ( self.debug_flag == True ):
+                print( "In " + me + ": top of loop - " + str( datetime.datetime.now() ) + " - latest post = " + current_post_reddit_id + " ( " + str( current_post_created_dt ) + " ), number " + str( post_count ) + "." )
     
-                    print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
-                    
-                #-- END DEBUG --#
-                
-                # first post? (I know, couldn't think of a better way...)
-                if ( post_count == 1 ):
-                
-                    # store the first ID.
-                    first_reddit_id_processed = current_post_id_with_type
-                    
-                #-- END check to see if post count = 1 --#
-                
-                #----------------------------------------------------------------
-                # conditions for stopping collection
-                #----------------------------------------------------------------
-                
-                # do we have a post count limit?
-                if ( ( post_count_limit_IN ) and ( post_count_limit_IN > 0 ) ):
-                
-                    # yes - has post count exceded this count?
-                    if ( post_count > post_count_limit_IN ):
-                    
-                        # it is.  stop.
-                        continue_collecting = False
-                        print( "In " + me + ": reddit post " + current_post_reddit_id + " is post number " + str( post_count ) + ", putting us over our limit of " + str( post_count_limit_IN ) + ".  Stopping collection." )
-                        
-                    #-- END check to see if current post puts us over our post limit. --#
-                
-                #-- END check for post count limit. --#
-                
-                # do we have an until ID?
-                if ( ( until_id_IN ) and ( until_id_IN != "" ) ):
-                
-                    # is current ID the until ID?
-                    if ( current_post_reddit_id == until_id_IN ):
-                    
-                        # it is.  stop.
-                        continue_collecting = False
-                        print( "In " + me + ": reddit post " + current_post_reddit_id + " is our until post ( " + until_id_IN + " ).  Stopping collection." )
-                        
-                    #-- END check to see if current post is post at which we are to stop. --#
-                
-                #-- END check for until ID. --#
-                
-                # do we have an until date?
-                if ( ( until_date_IN ) and ( until_date_IN != None ) ):
-                
-                    #-- we have an until date...  is current date less than until date?
-                    if ( current_post_created_dt < until_date_IN ):
-                    
-                        # it is.  stop.
-                        continue_collecting = False
-                        print( "In " + me + ": reddit post " + current_post_reddit_id + " has date " + str( current_post_created_dt ) + " that is past our until date.  Stopping collection." )
-                    
-                    #-- END check to see if post's date is past the cutoff. --#
-                
-                #-- END check to see if we have an until date --#
-
-                #----------------------------------------------------------------
-                # collection logic
-                #----------------------------------------------------------------
-                
-                # do we continue collecting?
-                if ( continue_collecting == True ):
-
-                    # Only process if either there is no subreddit list, or the
-                    #    subreddit is in the list.
-                    if ( ( len( subreddit_in_list_IN ) <= 0 ) or ( current_post_subreddit_id in subreddit_in_list_IN ) ):
-                    
-                        # ==> post already in database?
-                        try:
-                    
-                            # lookup post.
-                            django_post = reddit_collect.models.Post.objects.get( reddit_id = current_post_reddit_id )
-
-                            # post is in database
-                            is_post_in_database = True
-                            # print( "In " + me + ": reddit post " + current_post_reddit_id + " is already in database." )
-                            
-                        except:
-                        
-                            # Not found.  Create new instance, set flag.
-                            django_post = reddit_collect.models.Post()
-                            is_post_in_database = False
-                        
-                        #-- END - check for post in database --#
-                        
-                        # ==> Got existing?  (Could put this in except, still not
-                        #    sure how I feel about using exceptions for program
-                        #    flow)
-                        # OLD - allowing for update now.
-                        #if ( django_post == None ):
-
-                        # ==> Do we process this post?  We do if:
-                        # - post is not in database. - OR -
-                        # - post is in database, but update flag is true.
-                        if ( ( is_post_in_database == False ) or ( ( is_post_in_database == True ) and ( do_update_existing == True ) ) ):
-                        
-                            # Update appropriate counter
-                            if ( is_post_in_database == True ):
-
-                                # in database - increment update count.
-                                update_count += 1
-
-                            else:
-                            
-                                # not in database.  Increment new post count.
-                                new_posts_processed += 1
-                            
-                            #-- END counter increment. --#
-
-                            # set fields from reddiwrap post instance.
-                            django_post.set_fields_from_reddiwrap( current_rw_post, self.convert_4_byte_unicode_to_entity )
-                            
-                            # sanity check - are django_do_bulk_create and
-                            #    do_update_existing both true?
-                            if ( ( django_do_bulk_create == True ) and ( do_update_existing == True ) ):
-                            
-                                print( "==> In " + me + "(): ERROR - django_do_bulk_create and do_update_existing are both True.  Should never happen." )
-                            
-                            #-- END sanity check. --#
-
-                            # bulk create?
-                            # - Never bulk create if do_update_existing is True.
-                            if ( ( django_do_bulk_create == True ) and ( do_update_existing == False ) ):
-            
-                                # add post to bulk create list.
-                                django_post_create_list.append( django_post )
-                
-                            else: #-- not bulk create --#
-
-                                # exception handling around save, to deal with encoding (!).
-                                try:
-                                
-                                    # save to database.
-                                    django_post.save()
-                                    
-                                except Exception as e:
-                                
-                                    # error saving.  Probably encoding error.
+                # memory management.
+                gc.collect()
+                django.db.reset_queries()
     
-                                    # get exception details:
-                                    exception_type, exception_value, exception_traceback = sys.exc_info()
+                # set request start time (OK to be a little inefficient)
+                self.start_request()
+                
+                # bulk create?
+                if ( django_do_bulk_create == True ):
+                
+                    # clear out the bulk create list.
+                    django_post_create_list = []
+                    
+                #-- END check to see if doing bulk create. --#
     
-                                    # output
-                                    print( "====> In " + me + ": reddit post " + current_post_reddit_id + " threw exception on save()." )
-                                    print( "      - args = " + str( e.args ) )
-                                    print( "      - type = " + str( exception_type ) )
-                                    print( "      - value = " + str( exception_value ) )
-                                    print( "      - traceback = " + str( exception_traceback ) )
-                                    
-                                    # send email to let me know this crashed?
+                # get first set of results, or grab next set of results.
+                if ( post_count == 0 ):
     
-                                    # throw exception?
-                                    raise( e )
-                                    
-                                #-- END try-except around save() --#
-                                
-                            #-- END if...else check to see if doing bulk create. --#
-                                
-                        #-- END check to see if already in database --#
-                        
-                    #-- END check to see if subreddit list indicates we should process this post. --#
+                    # get first set of results for /r/all
+                    post_list = reddiwrap.get( api_url )
                     
-                #-- END check to see if we continue collecting --#
-            
-            #-- END loop over current set of posts. --#
-            
-            #--------------------------------------------------------------------
-            # bulk create?
-            #--------------------------------------------------------------------
-
-            if ( django_do_bulk_create == True ):
-            
-                # yes, bulk create.  Anything in the create list?
-                django_current_create_count = len( django_post_create_list )
-                if ( django_current_create_count > 0 ):
-                
-                    # yes.  Bulk create, then update count.
-                    # exception handling around save, to deal with encoding (!).
-                    try:
-                    
-                        # save to database using bulk_create().
-                        reddit_collect.models.Post.objects.bulk_create( django_post_create_list )
-                        
-                    except Exception as e:
-                    
-                        # error saving.  Probably encoding error.
-
-                        # get exception details:
-                        exception_type, exception_value, exception_traceback = sys.exc_info()
-
-                        # output
-                        print( "====> In " + me + ": bulk_create() threw exception.  Last reddit post ID processed: " + current_post_reddit_id + "; count of posts being bulk created = " + str( django_current_create_count ) )
-                        print( "      - args = " + str( e.args ) )
-                        print( "      - type = " + str( exception_type ) )
-                        print( "      - value = " + str( exception_value ) )
-                        print( "      - traceback = " + str( exception_traceback ) )
-                        
-                        # send email to let me know this crashed?
-
-                        # throw exception?
-                        raise( e )
-                        
-                    #-- END try-except around bulk_create() --#
-                    
-                    # increment the total posts created counter
-                    django_bulk_create_count += django_current_create_count
-                    
-                    # could empty create list here, but doing it at top of loop,
-                    #    so no need to do it twice.
-                
-                #-- END check to see if posts to create --#
-            
-            #-- END check to see if bulk create --#
-
-            #--------------------------------------------------------------------
-            # if we haven't already decided to stop, check if we can continue.
-            #--------------------------------------------------------------------
-
-            if ( continue_collecting == True ):
-            
-                # no reason to stop yet...  Do we have more posts?                
-                if ( reddiwrap.has_next() == False ):
-            
-                    # no - do not continue.
-                    continue_collecting = False
-                
                 else:
+                
+                    # get next set of posts.
+                    post_list = reddiwrap.get_next()
+    
+                #-- END check to see how we grab more posts. --#
+                
+                temp_dt = datetime.datetime.now()
+                print( "In " + me + ": after retrieving stuff from reddit - " + str( temp_dt ) + "; elapsed: " + str( temp_dt - self.request_start_time ) + " - latest post = " + current_post_reddit_id + " ( " + str( current_post_created_dt ) + " ), number " + str( post_count ) + "." )
             
-                    # see if we are allowed to continue.
-                    continue_collecting = self.may_i_continue()
+                #--------------------------------------------------------------------
+                # loop over posts.
+                #--------------------------------------------------------------------
+    
+                for current_rw_post in post_list:
+    
+                    # increment post counter.
+                    post_count += 1
+                
+                    # get info. on current post.
+                    current_post_reddit_id = current_rw_post.id
+                    current_post_id_with_type = "t3_" + current_post_reddit_id
+                    current_post_created = current_rw_post.created_utc
+                    current_post_created_dt = datetime.datetime.fromtimestamp( int( current_post_created ) )
+                    current_post_subreddit_id = current_rw_post.subreddit_id
+                    current_post_subreddit_name = current_rw_post.subreddit
+                    current_post_url = current_rw_post.url
                     
-                #-- END checks to see if we continue collecting. --#
-
-            #-- END check to see if we continue collecting. --#
+                    # initialize variables
+                    is_post_in_database = False
+                    
+                    if ( self.debug_flag == True ):
+        
+                        print( "In " + me + ": reddit post " + current_post_id_with_type + " is post number " + str( post_count ) + ", subreddit = " + current_post_subreddit_name + ": URL = " + current_post_url )
+                        
+                    #-- END DEBUG --#
+                    
+                    # first post? (I know, couldn't think of a better way...)
+                    if ( post_count == 1 ):
+                    
+                        # store the first ID.
+                        first_reddit_id_processed = current_post_id_with_type
+                        
+                    #-- END check to see if post count = 1 --#
+                    
+                    #----------------------------------------------------------------
+                    # conditions for stopping collection
+                    #----------------------------------------------------------------
+                    
+                    # do we have a post count limit?
+                    if ( ( post_count_limit_IN ) and ( post_count_limit_IN > 0 ) ):
+                    
+                        # yes - has post count exceded this count?
+                        if ( post_count > post_count_limit_IN ):
+                        
+                            # it is.  stop.
+                            continue_collecting = False
+                            print( "In " + me + ": reddit post " + current_post_reddit_id + " is post number " + str( post_count ) + ", putting us over our limit of " + str( post_count_limit_IN ) + ".  Stopping collection." )
+                            
+                        #-- END check to see if current post puts us over our post limit. --#
+                    
+                    #-- END check for post count limit. --#
+                    
+                    # do we have an until ID?
+                    if ( ( until_id_IN ) and ( until_id_IN != "" ) ):
+                    
+                        # is current ID the until ID?
+                        if ( current_post_reddit_id == until_id_IN ):
+                        
+                            # it is.  stop.
+                            continue_collecting = False
+                            print( "In " + me + ": reddit post " + current_post_reddit_id + " is our until post ( " + until_id_IN + " ).  Stopping collection." )
+                            
+                        #-- END check to see if current post is post at which we are to stop. --#
+                    
+                    #-- END check for until ID. --#
+                    
+                    # do we have an until date?
+                    if ( ( until_date_IN ) and ( until_date_IN != None ) ):
+                    
+                        #-- we have an until date...  is current date less than until date?
+                        if ( current_post_created_dt < until_date_IN ):
+                        
+                            # it is.  stop.
+                            continue_collecting = False
+                            print( "In " + me + ": reddit post " + current_post_reddit_id + " has date " + str( current_post_created_dt ) + " that is past our until date.  Stopping collection." )
+                        
+                        #-- END check to see if post's date is past the cutoff. --#
+                    
+                    #-- END check to see if we have an until date --#
+    
+                    #----------------------------------------------------------------
+                    # collection logic
+                    #----------------------------------------------------------------
+                    
+                    # do we continue collecting?
+                    if ( continue_collecting == True ):
+    
+                        # Only process if either there is no subreddit list, or the
+                        #    subreddit is in the list.
+                        if ( ( len( subreddit_in_list_IN ) <= 0 ) or ( current_post_subreddit_id in subreddit_in_list_IN ) ):
+                        
+                            # ==> post already in database?
+                            try:
+                        
+                                # lookup post.
+                                django_post = reddit_collect.models.Post.objects.get( reddit_id = current_post_reddit_id )
+    
+                                # post is in database
+                                is_post_in_database = True
+                                # print( "In " + me + ": reddit post " + current_post_reddit_id + " is already in database." )
+                                
+                            except:
+                            
+                                # Not found.  Create new instance, set flag.
+                                django_post = reddit_collect.models.Post()
+                                is_post_in_database = False
+                            
+                            #-- END - check for post in database --#
+                            
+                            # ==> Got existing?  (Could put this in except, still not
+                            #    sure how I feel about using exceptions for program
+                            #    flow)
+                            # OLD - allowing for update now.
+                            #if ( django_post == None ):
+    
+                            # ==> Do we process this post?  We do if:
+                            # - post is not in database. - OR -
+                            # - post is in database, but update flag is true.
+                            if ( ( is_post_in_database == False ) or ( ( is_post_in_database == True ) and ( do_update_existing == True ) ) ):
+                            
+                                # Update appropriate counter
+                                if ( is_post_in_database == True ):
+    
+                                    # in database - increment update count.
+                                    update_count += 1
+    
+                                else:
+                                
+                                    # not in database.  Increment new post count.
+                                    new_posts_processed += 1
+                                
+                                #-- END counter increment. --#
+    
+                                # set fields from reddiwrap post instance.
+                                django_post.set_fields_from_reddiwrap( current_rw_post, self.convert_4_byte_unicode_to_entity )
+                                
+                                # sanity check - are django_do_bulk_create and
+                                #    do_update_existing both true?
+                                if ( ( django_do_bulk_create == True ) and ( do_update_existing == True ) ):
+                                
+                                    print( "==> In " + me + "(): ERROR - django_do_bulk_create and do_update_existing are both True.  Should never happen." )
+                                
+                                #-- END sanity check. --#
+    
+                                # bulk create?
+                                # - Never bulk create if do_update_existing is True.
+                                if ( ( django_do_bulk_create == True ) and ( do_update_existing == False ) ):
+                
+                                    # add post to bulk create list.
+                                    django_post_create_list.append( django_post )
+                    
+                                else: #-- not bulk create --#
+    
+                                    # exception handling around save, to deal with encoding (!).
+                                    try:
+                                    
+                                        # save to database.
+                                        django_post.save()
+                                        
+                                    except Exception as e:
+                                    
+                                        # error saving.  Probably encoding error.
+        
+                                        # process exception.
+                                        error_email_subject = "Problem saving post."
+                                        exception_message = "In " + me + ": reddit post " + current_post_reddit_id + " threw exception on save()."
+                                        self.process_exception( e, exception_message, True, error_email_subject )
+                                                
+                                        # throw exception?
+                                        raise( e )
+                                        
+                                    #-- END try-except around save() --#
+                                    
+                                #-- END if...else check to see if doing bulk create. --#
+                                    
+                            #-- END check to see if already in database --#
+                            
+                        #-- END check to see if subreddit list indicates we should process this post. --#
+                        
+                    #-- END check to see if we continue collecting --#
+                
+                #-- END loop over current set of posts. --#
+                
+                #--------------------------------------------------------------------
+                # bulk create?
+                #--------------------------------------------------------------------
+    
+                if ( django_do_bulk_create == True ):
+                
+                    # yes, bulk create.  Anything in the create list?
+                    django_current_create_count = len( django_post_create_list )
+                    if ( django_current_create_count > 0 ):
+                    
+                        # yes.  Bulk create, then update count.
+                        # exception handling around save, to deal with encoding (!).
+                        try:
+                        
+                            # save to database using bulk_create().
+                            reddit_collect.models.Post.objects.bulk_create( django_post_create_list )
+                            
+                        except Exception as e:
+                        
+                            # error saving.  Probably encoding error.
+    
+                            # process exception.
+                            error_email_subject = "Problem bulk-saving posts."
+                            exception_message = "In " + me + ": bulk_create() threw exception.  Last reddit post ID processed: " + current_post_reddit_id + "; count of posts being bulk created = " + str( django_current_create_count )
+                            self.process_exception( e, exception_message, True, error_email_subject )
+    
+                            # throw exception?
+                            raise( e )
+                            
+                        #-- END try-except around bulk_create() --#
+                        
+                        # increment the total posts created counter
+                        django_bulk_create_count += django_current_create_count
+                        
+                        # could empty create list here, but doing it at top of loop,
+                        #    so no need to do it twice.
+                    
+                    #-- END check to see if posts to create --#
+                
+                #-- END check to see if bulk create --#
+    
+                #--------------------------------------------------------------------
+                # if we haven't already decided to stop, check if we can continue.
+                #--------------------------------------------------------------------
+    
+                if ( continue_collecting == True ):
+                
+                    # no reason to stop yet...  Do we have more posts?                
+                    if ( reddiwrap.has_next() == False ):
+                
+                        # no - do not continue.
+                        continue_collecting = False
+                    
+                    else:
+                
+                        # see if we are allowed to continue.
+                        continue_collecting = self.may_i_continue()
+                        
+                    #-- END checks to see if we continue collecting. --#
+    
+                #-- END check to see if we continue collecting. --#
+                
+            #-- END outer reddit collection loop --#
             
-        #-- END outer reddit collection loop --#
+        except Exception as e:
+        
+            # yes - send email about problems
+            error_email_subject = "Unexpected problem with post collector."
+            exception_message = "Unexpected problem with post collector.  Details:\n"
+            self.process_exception( e, exception_message, True, error_email_subject )
+            
+            # throw exception?
+            #raise( e )
+
+        #-- END super try/except around entire loop.
         
         # output overall summary
         summary_string = ""
@@ -954,21 +928,12 @@ class RedditCollector( BasicRateLimited ):
         print( temp_string )
         summary_string += "\n" + temp_string
         
-        # email summary?
-        if ( ( self.email_helper != None ) and ( ( self.email_status_address ) and ( self.email_status_address != None ) and ( self.email_status_address != "" ) ) ):
-        
-            # yes.  Build email
-            summary_email_subject = "Post collection complete - " + str( datetime.datetime.now() )
-            summary_email_message = "Post collection summary:\n"
-            summary_email_message += summary_string
-            
-            # send it.
-            summary_email_status = self.email_send( summary_email_message, summary_email_subject, self.email_status_address, self.email_status_address )
-            
-            # print status
-            print( "==> Summary email sent: " + summary_email_status )
-        
-        #-- END check to see if email summary --#
+        # email summary
+        summary_email_subject = "Post collection complete - " + str( datetime.datetime.now() )
+        summary_email_message = "Post collection summary:\n"
+        summary_email_message += summary_string
+        summary_email_status = self.email_send_status( summary_email_message, summary_email_subject )
+        print( "==> Summary email status: " + summary_email_status )
 
         return status_OUT
     
@@ -1069,7 +1034,7 @@ class RedditCollector( BasicRateLimited ):
     #-- END create_reddiwrap_instance() --#
 
 
-    def email_initialize( self, smtp_host_IN = "localhost", smtp_port_IN = "", smtp_use_ssl_IN = False, smtp_username_IN = "", smtp_password_IN = "", *args, **kwargs ):
+    def email_initialize( self, smtp_host_IN = "localhost", smtp_port_IN = -1, smtp_use_ssl_IN = False, smtp_username_IN = "", smtp_password_IN = "", *args, **kwargs ):
     
         '''
         Accepts properties that can be used to initialize an email helper
@@ -1078,6 +1043,7 @@ class RedditCollector( BasicRateLimited ):
     
         # declare variables
         my_email_helper = None
+        my_exception_helper = None
         
         # create email helper
         my_email_helper = EmailHelper()
@@ -1086,7 +1052,7 @@ class RedditCollector( BasicRateLimited ):
         my_email_helper.set_smtp_server_host( smtp_host_IN )
 
         # set port?
-        if ( ( smtp_port_IN ) and ( smtp_port_IN != None ) and ( smtp_port_IN != "" ) ):
+        if ( ( smtp_port_IN ) and ( smtp_port_IN != None ) and ( smtp_port_IN > 0 ) ):
         
             my_email_helper.set_smtp_server_port( smtp_port_IN )
         
@@ -1112,10 +1078,19 @@ class RedditCollector( BasicRateLimited ):
         # store in instance variable.
         self.email_helper = my_email_helper
         
+        # Do we have an Exception Helper?
+        my_exception_helper = self.exception_helper
+        if ( ( my_exception_helper ) and ( my_exception_helper ) ):
+        
+            # we do.  Add the email_helper to the exception helper, also.
+            my_exception_helper.email_helper = my_email_helper
+        
+        #-- END check to see if exception helper --#
+        
     #-- END method email_initialize() --#    
     
     
-    def email_send( self, message_IN = None, subject_IN = None, from_address_IN = None, to_address_IN = None ):
+    def email_send( self, message_IN = None, subject_IN = None, from_address_IN = None, to_address_IN = None, *args, **kwargs ):
 
         '''
         Uses nested email_helper instance to send email.  Returns status message.
@@ -1133,12 +1108,71 @@ class RedditCollector( BasicRateLimited ):
         # get email helper
         my_email_helper = self.email_helper
         
-        # send email
-        status_OUT = my_email_helper.send_email( message_IN, subject_IN, from_address_IN, to_address_IN )
+        # got a helper?
+        if ( ( my_email_helper ) and ( my_email_helper != None ) ):
+
+            # yes - send email
+            status_OUT = my_email_helper.send_email( message_IN, subject_IN, from_address_IN, to_address_IN )
+            
+        else:
+        
+            # no - error.
+            status_OUT = "ERROR - no email helper present, so can't send email."
+        
+        #-- END check to see if we have an email helper. --#
         
         return status_OUT
     
     #-- END method email_send() --#
+    
+    
+    def email_send_status( self, message_IN = None, subject_IN = None, *args, **kwargs ):
+
+        '''
+        If email helper and status email are set, uses nested email_helper
+           instance to send email to status email.  Returns status message.
+           If status returned is email_helper.STATUS_SUCCESS, then success, if
+           anything else, it is an error message explaining why the email was not
+           sent.
+        '''
+    
+        # return reference
+        status_OUT = ""
+    
+        # declare variables
+        my_email_helper = None
+        my_status_email = ""
+        
+        # get email helper and status address
+        my_email_helper = self.email_helper
+        my_status_email = self.email_status_address
+        
+        # got a helper?
+        if ( ( my_email_helper ) and ( my_email_helper != None ) ):
+
+            # yes.  Got a status email address?
+            if ( ( my_status_email ) and ( my_status_email != None ) and ( my_status_email != "" ) ):
+
+                # yes - send email
+                status_OUT = my_email_helper.send_email( message_IN, subject_IN, my_status_email, my_status_email )
+                
+            else:
+            
+                # no status email address set.
+                status_OUT = "ERROR - no email address set for sending status messages.  Can't send email status."
+            
+            #-- END check to see if status email present --#
+            
+        else:
+        
+            # no - error.
+            status_OUT = "ERROR - no email helper present, so can't send email."
+        
+        #-- END check to see if we have a mail helper. --#
+        
+        return status_OUT
+    
+    #-- END method email_send_status() --#
     
     
     def get_reddiwrap_instance( self, *args, **kwargs ):
@@ -1268,7 +1302,7 @@ class RedditCollector( BasicRateLimited ):
                 if ( ( is_comment_in_database == False ) or ( ( is_comment_in_database == True ) and ( do_update_existing == True ) ) ):
 
                     # Update appropriate counter
-                    if ( is_post_in_database == True ):
+                    if ( is_comment_in_database == True ):
 
                         # in database - increment update count.
                         update_count += 1
@@ -1311,17 +1345,10 @@ class RedditCollector( BasicRateLimited ):
                     
                         # error saving.  Probably encoding error.
 
-                        # get exception details:
-                        exception_type, exception_value, exception_traceback = sys.exc_info()
-
-                        # output
-                        print( "====> In " + me + ": reddit comment " + comment_reddit_full_id + " threw exception on save()." )
-                        print( "      - args = " + str( e.args ) )
-                        print( "      - type = " + str( exception_type ) )
-                        print( "      - value = " + str( exception_value ) )
-                        print( "      - traceback = " + str( exception_traceback ) )
-                        
-                        # send email to let me know this crashed?
+                        # process exception.
+                        error_email_subject = "Problem saving comment."
+                        exception_message = "In " + me + ": reddit comment " + comment_reddit_full_id + " threw exception on save()."
+                        self.process_exception( e, exception_message, True, error_email_subject )
 
                         # throw exception?
                         raise( e )
@@ -1466,6 +1493,53 @@ class RedditCollector( BasicRateLimited ):
     #-- END method process_comments_bulk --#
     
     
+    def process_exception( self, exception_IN = None, message_IN = "", send_email_IN = False, email_subject_IN = "", *args, **kwargs ):
+    
+        # return reference
+        status_OUT = self.STATUS_SUCCESS
+        
+        # declare variables
+        my_exception_helper = ""
+        
+        # get exception helper
+        my_exception_helper = self.exception_helper
+        if ( ( my_exception_helper ) and ( my_exception_helper != None ) ):
+
+            # process using exception_helper.
+            status_OUT = my_exception_helper.process_exception( exception_IN, message_IN, send_email_IN, email_subject_IN )
+            
+        #-- END check to see if we have a helper --#
+        
+        return status_OUT
+    
+    #-- END method process_exception() --#
+    
+    
+    def set_email_status_address( self, value_IN, *args, **kwargs ):
+    
+        '''
+        Accepts an email address, stores it internally, and in the nested
+           exception helper, so it can be used to email exception messages.
+        '''
+        
+        # declare variables
+        my_exception_helper = None
+        
+        # store the value
+        self.email_status_address = value_IN
+        
+        # see if we have an exception helper.
+        my_exception_helper = self.exception_helper
+        if ( ( my_exception_helper ) and ( my_exception_helper != None ) ):
+        
+            # we do.  Set it there, too.
+            my_exception_helper.email_status_address = value_IN
+        
+        #-- END check to see if we have an exception helper --#
+        
+    #-- END method set_email_status_address() --#
+
+
 #-- END class RedditCollector. --#
 
 '''
