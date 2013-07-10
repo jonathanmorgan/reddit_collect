@@ -445,6 +445,10 @@ Then, regardless, you'll need to do the following to set up the collector:
 - Q - Do we want time series on votes, voting, scores?
 - Q - praw or rediwrapper?
 
+## Thanks!
+
+This work has been supported by the National Science Foundation under Grant IIS-0968495.
+
 ## License:
 
 Copyright 2012, 2013 Jonathan Morgan
