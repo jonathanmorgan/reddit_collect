@@ -31,6 +31,9 @@ import reddiwrap.ReddiWrap
 from python_utilities.booleans.boolean_helper import BooleanHelper
 from python_utilities.django_utils.django_string_helper import DjangoStringHelper
 
+# django_reference_data
+import django_reference_data.models
+
 # python libraries
 import datetime
 
@@ -59,7 +62,7 @@ def safe_string( string_IN = None, encoding_IN = 'utf-8', entetize_4_byte_unicod
 
 
 @python_2_unicode_compatible
-class Abstract_Subreddit( models.Model ):
+class Abstract_Subreddit( django_reference_data.models.Abstract_Filterable ):
 
     #============================================================================
     # Django model fields.
@@ -446,7 +449,7 @@ class Domain( Abstract_Domain ):
 
 
 @python_2_unicode_compatible
-class Abstract_Post( models.Model ):
+class Abstract_Post( django_reference_data.models.Abstract_Filterable ):
 
 
     #----------------------------------------------------------------------
@@ -517,18 +520,6 @@ class Abstract_Post( models.Model ):
     # comment collection
     comment_collection_status = models.CharField( max_length = 255, choices = COMMENT_COLLECTION_STATUS_CHOICES, default = COMMENT_COLLECTION_STATUS_NEW )
     comments_last_collected = models.DateTimeField( null = True, blank = True )
-    
-    # filtering
-    filter_1 = models.BooleanField( default = False )
-    filter_2 = models.BooleanField( default = False )
-    filter_3 = models.BooleanField( default = False )
-    filter_4 = models.BooleanField( default = False )
-    filter_5 = models.BooleanField( default = False )
-    filter_6 = models.BooleanField( default = False )
-    filter_7 = models.BooleanField( default = False )
-    filter_8 = models.BooleanField( default = False )
-    filter_9 = models.BooleanField( default = False )
-    filter_10 = models.BooleanField( default = False )
     
     # timestamps
     create_date = models.DateTimeField( auto_now_add = True )
