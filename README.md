@@ -52,6 +52,31 @@ This code collects and stores data from reddit in a database, using django ORM m
 
 - configure the database in settings.py
 
+    - For postgresql (recommended for large data sets):
+
+        - create database user for django.
+        - make sure the database is configured to allow this user to connect via port 5432 on localhost.
+        - create database while connected using the user that django will use.
+        - In settings.py, in the DATABASES structure, in the "defaults" entry:
+            - set the ENGINE to "django.db.backends.postgresql_psycopg2"
+            - set the database NAME.
+            - Set USER and PASSWORD to the django database user you created.
+            - Set HOST to "localhost" (could vary based on how you have postgresql set up).
+            - Set PORT to 5432 (if you don't, it will assume that you want to connect via unix socket using the user currently logged in, not the user specified in the settings).
+        - Example:
+
+                DATABASES = {
+                    'default': {
+                        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
+                        'NAME': 'socs_reddit',                      # Or path to database file if using sqlite3.
+                        # The following settings are not used with sqlite3:
+                        'USER': 'django_user',
+                        'PASSWORD': '<psql_password>',
+                        'HOST': 'localhost',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
+                        'PORT': '5432',                      # Set to empty string for default.
+                    }
+                }
+
     - For mysql:
 
         - create mysql database.
@@ -61,7 +86,7 @@ This code collects and stores data from reddit in a database, using django ORM m
                     ALTER DATABASE <database_name> CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
         - create user to interact with mysql database.  Set permissions so user has all permissions to your database.
-        - In settings.py, in the DATABASES structure:
+        - In settings.py, in the DATABASES structure, in the "defaults" entry:
             - set the ENGINE to "django.db.backends.mysql"
             - set the database NAME, USER, and PASSWORD.
             - If the database is not on localhost, enter a HOST.
@@ -83,7 +108,7 @@ This code collects and stores data from reddit in a database, using django ORM m
     - For sqlite3:
 
         - figure out what file you want to hold the database.  For the initial implementation, we used reddit.sqlite in same directory as code (/home/socs/socs_reddit/reddit_collect/reddit.sqlite).
-        - In settings.py, in the DATABASES structure:
+        - In settings.py, in the DATABASES structure, in the "defaults" entry:
             - set the ENGINE to "django.db.backends.sqlite3"
             - set the database NAME (path to file), USER and PASSWORD if you set one on the database.
             - If the database is not on localhost, enter a HOST.
@@ -101,7 +126,6 @@ This code collects and stores data from reddit in a database, using django ORM m
                         'PORT': '',                      # Set to empty string for default.
                     }
                 }
-
 
 - in settings.py, add 'south' to the INSTALLED\_APPS list.  Example:
     
@@ -447,7 +471,7 @@ Then, regardless, you'll need to do the following to set up the collector:
 
 ## Thanks!
 
-This work has been supported by the National Science Foundation under Grant IIS-0968495.
+This work has been supported in part by the National Science Foundation under Grant IIS-0968495.
 
 ## License:
 
