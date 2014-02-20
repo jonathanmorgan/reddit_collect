@@ -520,6 +520,9 @@ class Abstract_Post( django_reference_data.models.Abstract_Filterable ):
     # comment collection
     comment_collection_status = models.CharField( max_length = 255, choices = COMMENT_COLLECTION_STATUS_CHOICES, default = COMMENT_COLLECTION_STATUS_NEW )
     comments_last_collected = models.DateTimeField( null = True, blank = True )
+    num_comments_collected = models.IntegerField( null = True, blank = True )
+    has_more_comments = models.BooleanField( blank = True, default = False )
+    more_comments_details = models.TextField( null = True, blank = True )
     
     # timestamps
     create_date = models.DateTimeField( auto_now_add = True )
@@ -839,6 +842,8 @@ class Abstract_Comment( models.Model ):
     approved_by = models.TextField( null = True, blank = True )
     flair_class = models.TextField( null = True, blank = True )
     flair_text = models.TextField( null = True, blank = True )
+    has_more_comments = models.BooleanField( blank = True, default = False )
+    more_comments_details = models.TextField( null = True, blank = True )
     create_date = models.DateTimeField( auto_now_add = True )
     last_update = models.DateTimeField( auto_now = True )
 
@@ -896,11 +901,11 @@ class Abstract_Comment( models.Model ):
             self.approved_by = instance_IN.approved_by
             self.flair_class = instance_IN.flair_class
             self.flair_text = safe_string( instance_IN.flair_text, entetize_4_byte_unicode_IN = entetize_4_byte_unicode_IN )
-            
+            self.has_more_comments = instance_IN.has_more_comments
+            self.more_comments_details = instance_IN.more_comments
+
             # what to do about these?
             # self.children    = []
-            # self.has_more_comments = False
-            # self.more_comments = ''
 
         #-- END check to make sure instance passed in. --#
     

@@ -3,24 +3,77 @@
 # import the RedditCollector class
 from reddit_collect.redditCollector import RedditCollector
 
+# python standard library imports
+import datetime
+
+# import python_utilities
+from python_utilities.logging.summary_helper import SummaryHelper
+
+# import reddit_collect models.
+import reddit_collect.models
+
+# declare variables
+my_summary_helper = None
+summary_string = ""
+my_user_agent = "<user_agent>"
+my_username = "<reddit_username>"
+my_password = "<reddit_password>"
+reddit_collector = None
+post_qs = None
+django_post = None
+comment_rw_post = None
+reddiwrap = None
+top_comments = None
+
+# init connection information
+
+# BEFORE RUNNING, SET reddit_post_id
+#reddit_post_id = '1cp0i3' # 113
+reddit_post_id = '1d67nv' # 569
+print( "testing post " + reddit_post_id )
+
+#================================================================================
+# collect comments using RedditCollector
+#================================================================================
+
 # make an instance
 reddit_collector = RedditCollector()
 
-# initialize bare minimum connection parameters.
-reddit_collector.user_agent = "reddit comment collector v0.1 by /u/jonathan_morgan"
+# initialize connection parameters.
+reddit_collector.user_agent = my_user_agent
+reddit_collector.username = my_username
+reddit_collector.password = my_password
 
-import reddit_collect.models
-post_qs = reddit_collect.models.Post.objects.filter( reddit_id = '1cp0i3' )
+# set collector to output details
+reddit_collector.do_output_details = False
+
+# set bulk collection flag (defaults to True)
+#reddit_collector.do_bulk_create = False
+
+# initialize summary helper
+my_summary_helper = SummaryHelper()
+
+# get post QuerySet
+#post_qs = reddit_collect.models.Post.objects.filter( reddit_id = reddit_post_id )
+post_qs = reddit_collect.models.Post.objects.filter( reddit_id__in = [ '1cp0i3', '1d67nv' ] )
 
 # num_comments?
 django_post = post_qs[ 0 ]
-print( django_post.num_comments ) # 115, at time of collection
+print( "==> num_comments: " + str( django_post.num_comments ) ) # 115, at time of collection
+
+my_summary_helper.set_prop_value( "num_comments", django_post.num_comments )
+my_summary_helper.set_prop_desc( "num_comments", "num_comments (post)" )
     
 # pass the QuerySet to the collect_comments() method.
 reddit_collector.collect_comments( post_qs )
 
+#================================================================================
+# Now, compare collect_comments() output to just grabbing comments with reddiwrap
+#================================================================================
+
 # refresh post.
-django_post = reddit_collect.models.Post.objects.get( reddit_id = '1cp0i3' )
+# reddit_post_id = '1cp0i3'
+django_post = reddit_collect.models.Post.objects.get( reddit_id = reddit_post_id )
 
 # get reddiwrap post, so we can pull comments from reddit.
 comment_rw_post = django_post.create_reddiwrap_post()
@@ -29,69 +82,64 @@ comment_rw_post = django_post.create_reddiwrap_post()
 reddiwrap = reddit_collector.create_reddiwrap_instance()
 
 # fetch comments
-reddiwrap.fetch_comments( comment_rw_post )
+reddiwrap.fetch_comments( comment_rw_post, limit = 1500 )
 
 # get top-level comments
 top_comments = comment_rw_post.comments
 
 # print top-level comment count
-print( "top-level comment count: " + str ( len( top_comments ) ) )
+print( "==> top-level comment count: " + str ( len( top_comments ) ) )
 
 # get first comment
 top_comment_1 = top_comments[ 0 ]
 
-# loop over all the top_comments, outputting id, user, score.
-for comment in top_comments:
+# make recursive function to count total comments.
+def count_comments( comment_list_IN = None, indent_IN = "" ):
+    
+    # return reference
+    count_OUT = -1
+    
+    # declare variables
+    comment = None
 
-    print( "- comment " + comment.id + " - by " + comment.author + " - score: " + str( comment.score ) + "; up = " + str( comment.upvotes ) + "; down = " + str( comment.downvotes ) + " - child count: " + str( len( comment.children ) ) )
-
-    if ( len( comment.children ) > 0 ):
-
-        for child_comment in comment.children:
-
-            print( "    - comment " + child_comment.id + " - by " + child_comment.author + " - score: " + str( child_comment.score ) + "; up = " + str( child_comment.upvotes ) + "; down = " + str( child_comment.downvotes ) + " - child count: " + str( len( child_comment.children ) ) )
-
-            if ( len( child_comment.children ) > 0 ):
-            
-                for child_comment_2 in child_comment.children:
-                
-                    print( "        - comment " + child_comment_2.id + " - by " + child_comment_2.author + " - score: " + str( child_comment_2.score ) + "; up = " + str( child_comment_2.upvotes ) + "; down = " + str( child_comment_2.downvotes ) + " - child count: " + str( len( child_comment_2.children ) ) )
+    # loop over comments in list
+    count_OUT = 0
+    for comment in comment_list_IN:
+    
+        # increment counter
+        count_OUT += 1
         
-                    if ( len( child_comment_2.children ) > 0 ):
-                    
-                        for child_comment_3 in child_comment_2.children:
-                        
-                            print( "            - comment " + child_comment_3.id + " - by " + child_comment_3.author + " - score: " + str( child_comment_3.score ) + "; up = " + str( child_comment_3.upvotes ) + "; down = " + str( child_comment_3.downvotes ) + " - child count: " + str( len( child_comment_3.children ) ) )
-                
-                            if ( len( child_comment_3.children ) > 0 ):
-                            
-                                for child_comment_4 in child_comment_3.children:
-
-                                    print( "                - comment " + child_comment_4.id + " - by " + child_comment_4.author + " - score: " + str( child_comment_4.score ) + "; up = " + str( child_comment_4.upvotes ) + "; down = " + str( child_comment_4.downvotes ) + " - child count: " + str( len( child_comment_4.children ) ) )
-                        
-                                    if ( len( child_comment_4.children ) > 0 ):
-
-                                        print( "And there's more!" )                                    
-
-                                    #-- END check to see if child comments --#
-
-                                #-- END loop over child comments four levels deep. --#
-                                
-                            #-- END check to see if child comments --#
-                            
-                        #-- END loop over child comments at level 3 --#
+        # print comment summary
+        created_from_obj = comment.created_utc
+        created_dt = datetime.datetime.fromtimestamp( created_from_obj )
+        print( indent_IN + "- comment " + comment.id + " - created " + str( created_dt ) + " - by " + comment.author + " - score: " + str( comment.score ) + "; up = " + str( comment.upvotes ) + "; down = " + str( comment.downvotes ) + " - child count: " + str( len( comment.children ) ) )
         
-                    #-- END check to see if child comments --#
-                    
-                #-- END loop over child coments at level 1 --#
-
-            #-- END check to see if child comments --#
+        # see if comment has children
+        if ( len( comment.children ) > 0 ):
         
-        #-- END look over level 1 child comments --#
+            # yes, there are children.  Recurse!
+            count_OUT += count_comments( comment_list_IN = comment.children, indent_IN = indent_IN + "    " )
 
-    #-- END check for child comments --#
+        #-- END check to see if children --#
+    
+    #-- END loop over comments. --#
+    
+    return count_OUT
+    
+#-- END function count_comments() --#
 
-#-- END loop over top-level comments --#
+# count comments
+comment_count = count_comments( comment_list_IN = top_comments )
+my_summary_helper.set_prop_value( "comment_count", comment_count )
+my_summary_helper.set_prop_desc( "comment_count", "Comment Count" )
+
+# set stop time.
+my_summary_helper.set_stop_time()
+
+# generate summary string.
+summary_string += my_summary_helper.create_summary_string( item_prefix_IN = "==> " )
+print( summary_string )
+
 
 '''
 Collected comments for /r/boston
@@ -102,4 +150,3 @@ Collected comments for /r/boston
 ==> Collection ended: 2013-04-28 15:00:38.835510
 ==> Duration: 1:22:48.886315
 '''
-
