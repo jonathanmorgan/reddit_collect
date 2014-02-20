@@ -1376,7 +1376,16 @@ class RedditCollector( BasicRateLimited ):
                     # if post, set post (better be a post).
                     if ( ( post_IN ) and ( post_IN != None ) ):
 
+                        # store reference to post in comment.
                         django_comment.post = post_IN
+                        
+                        # does the post reference a subreddit?
+                        if ( ( post_IN.subreddit ) and ( post_IN.subreddit is not None ) ):
+                        
+                            # yes - put reference to it in comment, as well.
+                            django_comment.subreddit = post_IN.subreddit
+                        
+                        #-- END check to see if post has a subreddit. --#
                         
                     #-- END check to see if related post passed in. --#
                     
@@ -1550,8 +1559,17 @@ class RedditCollector( BasicRateLimited ):
                 # if post, set post (better be a post).
                 if ( ( post_IN ) and ( post_IN != None ) ):
 
+                    # store reference to post in comment.
                     django_comment.post = post_IN
                     
+                    # does the post reference a subreddit?
+                    if ( ( post_IN.subreddit ) and ( post_IN.subreddit is not None ) ):
+                    
+                        # yes - put reference to it in comment, as well.
+                        django_comment.subreddit = post_IN.subreddit
+                    
+                    #-- END check to see if post has a subreddit. --#
+                        
                 #-- END check to see if related post passed in. --#
 
                 # ==> Got existing?  (Could put this in except, still not
