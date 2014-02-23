@@ -1,3 +1,6 @@
+# start to python 3 support:
+from __future__ import unicode_literals
+
 '''
 Copyright 2012, 2013 Jonathan Morgan
 
@@ -89,6 +92,9 @@ class RedditCollector( BasicRateLimited ):
     # performance
     do_bulk_create = True
     
+    # check for existing?
+    do_check_for_existing = True
+    
     # encoding, to deal with utf8 in mysql actually just allowing for up to
     #    3-byte unicode characters, not all (4-byte and above).
     convert_4_byte_unicode_to_entity = False
@@ -140,6 +146,9 @@ class RedditCollector( BasicRateLimited ):
         
         # performance
         self.do_bulk_create = True
+        
+        # check for existing?
+        self.do_check_for_existing = True
         
         # encoding
         self.convert_4_byte_unicode_to_entity = True
@@ -312,7 +321,7 @@ class RedditCollector( BasicRateLimited ):
                     # increment post counter
                     post_counter += 1
                     
-                    print( "- " + str( post_counter ) + " of " + str( post_count ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - num_comments: " + str( current_post.num_comments ) + " - created on " + str( current_post.created_utc_dt ) )
+                    print( "- " + str( post_counter ) + " of " + str( post_count ) + " - " + str( datetime.datetime.now() ) + " - post " + str( current_post.id ) + " ( reddit ID: " + current_post.reddit_id + " ) by " + current_post.author_name + " - num_comments: " + str( current_post.num_comments ) + " - created on " + str( current_post.created_utc_dt ) )
     
                     # memory management.
                     gc.collect()
@@ -1374,7 +1383,7 @@ class RedditCollector( BasicRateLimited ):
                     django_comment.set_fields_from_reddiwrap( current_rw_comment, self.convert_4_byte_unicode_to_entity )
                     
                     # if post, set post (better be a post).
-                    if ( ( post_IN ) and ( post_IN != None ) ):
+                    if ( ( post_IN ) and ( post_IN is not None ) ):
 
                         # store reference to post in comment.
                         django_comment.post = post_IN
@@ -1390,7 +1399,7 @@ class RedditCollector( BasicRateLimited ):
                     #-- END check to see if related post passed in. --#
                     
                     # if parent comment, set it.
-                    if ( ( parent_comment_IN ) and ( parent_comment_IN != None ) ):
+                    if ( ( parent_comment_IN ) and ( parent_comment_IN is not None ) ):
                     
                         django_comment.parent = parent_comment_IN
                     

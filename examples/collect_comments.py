@@ -85,6 +85,9 @@ post_qs = post_qs.filter( num_comments__gte = 10 )
 # limit to num_comments <= 1500
 post_qs = post_qs.filter( num_comments__lte = 1500 )
 
+# limit to just those we haven't collected comments on yet.
+#post_qs = post_qs.filter( comment_collection_status = "new" )
+
 # order by number of comments, DESC
 post_qs = post_qs.order_by( "-num_comments" )
 
