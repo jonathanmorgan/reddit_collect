@@ -72,7 +72,14 @@ reddit_collector.set_email_status_address( "<email_address>" )
 import reddit_collect.models
 
 # get all posts where the related subreddit has filter_1 = True.
-matching_subreddit_qs = reddit_collect.models.Subreddit.objects.filter( filter_1 = True ).values( 'id' )
+#matching_subreddit_qs = reddit_collect.models.Subreddit.objects.filter( filter_1 = True ).values( 'id' )
+
+# get all posts where the related subreddit has filter_2 = True AND filter_1 = False.
+matching_subreddit_qs = reddit_collect.models.Subreddit.objects.filter( filter_2 = True )
+matching_subreddit_qs = matching_subreddit_qs.filter( filter_1 = False )
+matching_subreddit_qs = matching_subreddit_qs.values( 'id' )
+
+# retrieve post query set
 post_qs = reddit_collect.models.Post.objects.filter( subreddit_id__in = matching_subreddit_qs )
 
 # OR less fancy
